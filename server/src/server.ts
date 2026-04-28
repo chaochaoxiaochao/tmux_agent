@@ -3,6 +3,7 @@ import { TmuxControl } from './tmux-control.js';
 import type { Config } from './config.schema.js';
 import { registerWindowsRoutes } from './routes/api.windows.js';
 import { registerPtyBridge } from './pty-bridge.js';
+import { registerWallChannel } from './wall-snapshots.js';
 
 export interface ExtendedConfig extends Config {
   tmux: Config['tmux'] & { socket?: string };
@@ -17,6 +18,7 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
 
   await registerWindowsRoutes(app);
   await registerPtyBridge(app);
+  registerWallChannel(app);
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as any).statusCode ?? 500;
