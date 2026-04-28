@@ -1,0 +1,11 @@
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0a; --bg-alt: #161616; --ink: #ddd; --ink-dim: #888; --ink-faint: #555;
+  --accent: #9bd28b; --warn: #e8b86d; --err: #d97766;
+}
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px system-ui, -apple-system, sans-serif; }
+.app-root { display: flex; flex-direction: column; height: 100%; }
+button { background: var(--bg-alt); color: var(--ink); border: 1px solid var(--ink-faint); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+input { background: var(--bg-alt); color: var(--ink); border: 1px solid var(--ink-faint); border-radius: 4px; padding: 6px 10px; font: inherit; }
