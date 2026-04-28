@@ -8,23 +8,20 @@ export async function registerPtyBridge(app: FastifyInstance) {
   app.get('/ws/term/:session/:id', { websocket: true } as any, (conn, req) => {
     const { session, id } = req.params as { session: string; id: string };
     const socketName = (app.cfg.tmux as any).socket as string | undefined;
+    const tmuxPrefix = socketName ? ['-L', socketName] : [];
 
-    const tmuxArgs = [
-      ...(socketName ? ['-L', socketName] : []),
-      'attach-session', '-t', session,
-    ];
+    // Make the target window active before attach. Avoids racing a prefix-key
+    // sequence after attach, which would leave tmux in command-prompt mode and
+    // paint the status bar yellow.
+    app.tmux.selectWindow(session, id).catch(() => { /* best effort */ });
 
-    const ptyProc = pty.spawn('tmux', tmuxArgs, {
+    const ptyProc = pty.spawn('tmux', [...tmuxPrefix, 'attach-session', '-t', session], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd: process.env.HOME,
       env: process.env as any,
     });
-
-    setTimeout(() => {
-      ptyProc.write(`\x02:select-window -t ${session}:${id}\n`);
-    }, 100);
 
     ptyProc.onData(data => {
       try { conn.send(data, { binary: true }); } catch { /* dead */ }

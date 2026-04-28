@@ -63,6 +63,10 @@ export class TmuxControl {
     await this.run(cmd.killWindow(session, windowId));
   }
 
+  async selectWindow(session: string, windowId: string): Promise<void> {
+    await this.run(cmd.selectWindow(session, windowId));
+  }
+
   async sendKeys(session: string, windowId: string, text: string): Promise<void> {
     const segs = sliceSendKeys(text);
     for (const seg of segs) {

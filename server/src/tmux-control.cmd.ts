@@ -27,6 +27,10 @@ export function killWindow(session: string, windowId: string): string[] {
   return ['kill-window', '-t', `${session}:${windowId}`];
 }
 
+export function selectWindow(session: string, windowId: string): string[] {
+  return ['select-window', '-t', `${session}:${windowId}`];
+}
+
 export function hasSession(session: string): string[] {
   return ['has-session', '-t', session];
 }
