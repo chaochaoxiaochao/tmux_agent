@@ -26,14 +26,11 @@ export const DEFAULT_CONFIG: Config = {
     { name: 'commit', hint: 'git commit -m', payload: 'git commit -m "' },
     { name: 'clear', hint: 'clear screen', payload: 'clear\n' },
   ],
-  statusRules: [
-    // Claude Code waiting for user input: status bar shows 'Esc to cancel'
-    // (case-sensitive — distinct from the 'esc to interrupt' working banner).
-    // Y/N prompts, 'Apply edit?' style asks, and numbered menu choices too.
-    { match: 'Esc to cancel|\\[y/N\\]|Apply edit\\?|Continue\\?|❯ \\d\\.', status: 'warn' },
-    { match: 'Error:|panic:|FATAL', status: 'err' },
-    { match: '✓|passed|finished', status: 'ok' },
-  ],
+  // Empty by default. Wall tile color falls back to running/idle
+  // (lastOutputAgeMs < 5s = green, else gray). External hooks
+  // (POST /api/notify) drive the WAIT/DONE pulse.
+  // Add your own here if you want extra rule-based highlighting.
+  statusRules: [],
   log: { level: 'info', file: '~/.local/share/tmux-agent/server.log' },
 };
 

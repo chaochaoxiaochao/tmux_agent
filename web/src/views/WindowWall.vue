@@ -25,11 +25,10 @@
           @click="open(s.name, w)"
         >
           <header>
-            <span class="tile-dot" :class="{ pulse: !!w.attention || w.status === 'warn' }"></span>
+            <span class="tile-dot" :class="{ pulse: !!w.attention }"></span>
             <span class="tile-name">{{ w.index }}: {{ w.name }}</span>
             <span class="status-badge attn" v-if="w.attention === 'input-needed'">INPUT</span>
             <span class="status-badge done" v-else-if="w.attention === 'done'">DONE</span>
-            <span class="status-badge" v-else-if="statusLabel(w.status)">{{ statusLabel(w.status) }}</span>
             <span class="age">{{ humanAge(w.lastOutputAgeMs) }}</span>
           </header>
           <pre class="preview-summary">{{ summarize(w.preview) }}</pre>
@@ -101,12 +100,6 @@ function humanAge(ms: number): string {
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   return `${Math.floor(s / 3600)}h`;
 }
-
-function statusLabel(s: string): string {
-  if (s === 'warn') return 'wait';   // user input wanted
-  if (s === 'err')  return 'err';
-  return '';                          // ok / running / idle = no label
-}
 </script>
 
 <style scoped>
@@ -136,8 +129,6 @@ function statusLabel(s: string): string {
 }
 .tile:hover { border-color: var(--accent); }
 .tile.st-running { border-color: var(--accent); }
-.tile.st-warn { border-color: var(--warn); background: rgba(232, 184, 109, 0.06); }
-.tile.st-err  { border-color: var(--err);  background: rgba(217, 119, 102, 0.06); }
 .tile.st-idle { opacity: 0.7; }
 /* Attention from external hooks (Claude Code Notification/Stop) overrides
  * the rule-based color so it's clearly visible. */
@@ -172,9 +163,6 @@ function statusLabel(s: string): string {
 }
 .tile-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex: 0 0 8px; }
 .tile.st-running .tile-dot { background: var(--accent); }
-.tile.st-ok      .tile-dot { background: var(--accent); }
-.tile.st-warn    .tile-dot { background: var(--warn); }
-.tile.st-err     .tile-dot { background: var(--err); }
 .tile-dot.pulse {
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
@@ -191,10 +179,9 @@ function statusLabel(s: string): string {
   flex: 0 0 auto;
   font: 10px ui-monospace, monospace;
   padding: 1px 6px; border-radius: 8px;
-  background: var(--warn); color: #000;
+  color: #000;
   text-transform: uppercase; letter-spacing: 0.5px;
 }
-.tile.st-err .status-badge:not(.done):not(.attn) { background: var(--err); }
 .status-badge.attn { background: var(--warn); }
 .status-badge.done { background: #6db3e8; }
 .age { color: var(--ink-faint); font: 11px ui-monospace, monospace; flex: 0 0 auto; }
