@@ -9,15 +9,12 @@
       <textarea
         ref="ta"
         v-model="text"
-        placeholder="type, paste, or 🎤 voice..."
+        placeholder="type or paste..."
         rows="4"
         autofocus
       ></textarea>
 
       <footer class="actions">
-        <button @click="toggleVoice" :class="{ rec: recording }">
-          {{ recording ? '● rec' : '🎤' }}
-        </button>
         <span class="spacer"></span>
         <button @click="close">cancel</button>
         <button class="send" @click="sendNow" :disabled="!text">send ⏎</button>
@@ -34,15 +31,12 @@ const props = defineProps<{ open: boolean; session: string; windowId: string }>(
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>();
 
 const text = ref('');
-const recording = ref(false);
 const ta = ref<HTMLTextAreaElement | null>(null);
 
 watch(() => props.open, (v) => {
   if (v) {
     text.value = '';
     nextTick(() => ta.value?.focus());
-  } else if (rec) {
-    try { rec.stop(); } catch { }
   }
 });
 
@@ -53,23 +47,6 @@ async function sendNow() {
   try { await api.send(props.session, props.windowId, text.value + '\n'); }
   catch (e: any) { alert(e.message); return; }
   close();
-}
-
-let rec: any = null;
-function toggleVoice() {
-  const W = window as any;
-  const SR = W.SpeechRecognition || W.webkitSpeechRecognition;
-  if (!SR) { alert('Web Speech API unsupported'); return; }
-  if (recording.value && rec) { try { rec.stop(); } catch { } return; }
-  rec = new SR();
-  rec.continuous = false;
-  rec.interimResults = false;
-  rec.lang = navigator.language || 'en-US';
-  rec.onresult = (ev: any) => { text.value += ev.results[0][0].transcript; };
-  rec.onend = () => { recording.value = false; };
-  rec.onerror = () => { recording.value = false; };
-  rec.start();
-  recording.value = true;
 }
 </script>
 
@@ -111,5 +88,4 @@ textarea:focus { border-color: var(--accent); }
 .spacer { flex: 1; }
 .send { color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .send:disabled { opacity: 0.4; }
-button.rec { background: var(--err); color: #000; }
 </style>
