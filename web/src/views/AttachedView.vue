@@ -7,12 +7,22 @@
     <div class="term-area">
       <XtermPane :window-id="id" />
     </div>
+    <InputBar @send="onSend" />
+    <FixedButtonBar @send="onSend" />
   </div>
 </template>
 
 <script setup lang="ts">
 import XtermPane from '../components/XtermPane.vue';
-defineProps<{ id: string }>();
+import InputBar from '../components/InputBar.vue';
+import FixedButtonBar from '../components/FixedButtonBar.vue';
+import { api } from '../api';
+const props = defineProps<{ id: string }>();
+
+async function onSend(payload: string) {
+  try { await api.send(props.id, payload); }
+  catch (e: any) { alert(e.message); }
+}
 </script>
 
 <style scoped>
