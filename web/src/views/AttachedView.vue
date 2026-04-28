@@ -8,6 +8,7 @@
       <div class="term-area"><XtermPane :session="session" :window-id="id" /></div>
       <StatusPanel :window-id="id" :title="`${session} : ${id}`" />
     </div>
+    <ScrollControls :session="session" :window-id="id" />
     <InputBar @send="onSend" />
     <FixedButtonBar @send="onSend" />
   </div>
@@ -16,6 +17,7 @@
 <script setup lang="ts">
 import XtermPane from '../components/XtermPane.vue';
 import StatusPanel from '../components/StatusPanel.vue';
+import ScrollControls from '../components/ScrollControls.vue';
 import InputBar from '../components/InputBar.vue';
 import FixedButtonBar from '../components/FixedButtonBar.vue';
 import { api } from '../api';

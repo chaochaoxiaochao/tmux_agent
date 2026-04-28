@@ -31,6 +31,10 @@ export const api = {
   killAll: (session: string) => http<void>('POST', `${wbase(session)}/kill-all`),
   send: (session: string, id: string, text: string) =>
     http<void>('POST', `${wbase(session)}/${enc(id)}/send`, { text }),
+  copyMode: (session: string, id: string) =>
+    http<void>('POST', `${wbase(session)}/${enc(id)}/copy-mode`),
+  sendKey: (session: string, id: string, key: string) =>
+    http<void>('POST', `${wbase(session)}/${enc(id)}/key`, { key }),
 
   // buttons (global)
   buttons: () => http<Button[]>('GET', '/api/buttons'),

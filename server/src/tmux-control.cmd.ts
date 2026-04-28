@@ -31,6 +31,10 @@ export function selectWindow(session: string, windowId: string): string[] {
   return ['select-window', '-t', `${session}:${windowId}`];
 }
 
+export function copyMode(session: string, windowId: string): string[] {
+  return ['copy-mode', '-t', `${session}:${windowId}`];
+}
+
 export function hasSession(session: string): string[] {
   return ['has-session', '-t', session];
 }

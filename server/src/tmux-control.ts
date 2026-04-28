@@ -67,6 +67,14 @@ export class TmuxControl {
     await this.run(cmd.selectWindow(session, windowId));
   }
 
+  async copyMode(session: string, windowId: string): Promise<void> {
+    await this.run(cmd.copyMode(session, windowId));
+  }
+
+  async sendKey(session: string, windowId: string, key: string): Promise<void> {
+    await this.run(['send-keys', '-t', `${session}:${windowId}`, key]);
+  }
+
   async sendKeys(session: string, windowId: string, text: string): Promise<void> {
     const segs = sliceSendKeys(text);
     for (const seg of segs) {

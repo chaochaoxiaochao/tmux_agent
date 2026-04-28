@@ -69,6 +69,46 @@ export async function registerWindowsRoutes(app: FastifyInstance) {
     },
   );
 
+  // Enter tmux copy-mode for the given window. Lets the client read the
+  // window's scrollback buffer without touching the prefix key.
+  app.post<{ Params: { session: string; id: string } }>(
+    '/api/sessions/:session/windows/:id/copy-mode',
+    async (req, reply) => {
+      const { session, id } = req.params;
+      const exists = (await app.tmux.listWindows(session)).some(w => w.id === id);
+      if (!exists) {
+        reply.status(404).send({ error: 'window_not_found', message: `${session}:${id}` });
+        return;
+      }
+      try { await app.tmux.copyMode(session, id); }
+      catch (e: any) { reply.status(502).send({ error: 'copy_mode_failed', message: e.message }); return; }
+      reply.status(204).send();
+    },
+  );
+
+  // Send a single named tmux key (e.g. Up, Down, PageUp, PageDown, q, Escape)
+  // to a window. Used by the copy-mode controls. Distinct from /send (which
+  // takes free text and goes through the slicer).
+  app.post<{ Params: { session: string; id: string }, Body: { key: string } }>(
+    '/api/sessions/:session/windows/:id/key',
+    async (req, reply) => {
+      const { session, id } = req.params;
+      const key = req.body?.key;
+      if (!key || typeof key !== 'string' || key.length > 32) {
+        reply.status(400).send({ error: 'bad_input', message: 'key required (string, ≤32)' });
+        return;
+      }
+      const exists = (await app.tmux.listWindows(session)).some(w => w.id === id);
+      if (!exists) {
+        reply.status(404).send({ error: 'window_not_found', message: `${session}:${id}` });
+        return;
+      }
+      try { await app.tmux.sendKey(session, id, key); }
+      catch (e: any) { reply.status(502).send({ error: 'send_failed', message: e.message }); return; }
+      reply.status(204).send();
+    },
+  );
+
   app.post<{ Params: { session: string; id: string }, Body: { text: string } }>(
     '/api/sessions/:session/windows/:id/send',
     async (req, reply) => {
