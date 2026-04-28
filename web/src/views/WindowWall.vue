@@ -22,11 +22,12 @@
           @click="open(s.name, w)"
         >
           <header>
-            <span class="tile-dot"></span>
+            <span class="tile-dot" :class="{ pulse: w.status === 'warn' }"></span>
             <span class="tile-name">{{ w.index }}: {{ w.name }}</span>
-            <span class="age">{{ Math.round(w.lastOutputAgeMs / 1000) }}s</span>
+            <span class="status-badge" v-if="statusLabel(w.status)">{{ statusLabel(w.status) }}</span>
+            <span class="age">{{ humanAge(w.lastOutputAgeMs) }}</span>
           </header>
-          <div class="preview-summary">{{ summarize(w.preview) }}</div>
+          <pre class="preview-summary">{{ summarize(w.preview) }}</pre>
           <pre class="preview-full">{{ w.preview.join('\n') }}</pre>
         </div>
         <div v-if="s.windows.length === 0" class="session-empty">no windows</div>
@@ -76,14 +77,30 @@ async function newWindow(session: string) {
   catch (e: any) { alert(e.message); }
 }
 
-// Pick the last non-blank line of preview as a one-line summary.
-// Most recent activity is the most informative on a small mobile tile.
+// Pick the last few non-blank lines of preview as a multi-line summary.
+// On mobile we show this in place of the full preview, so 3 lines is a
+// useful glance: usually shows the prompt + last command output.
 function summarize(lines: string[]): string {
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const t = lines[i].trim();
-    if (t) return t;
+  const out: string[] = [];
+  for (let i = lines.length - 1; i >= 0 && out.length < 3; i--) {
+    const t = lines[i].replace(/\s+$/, '');
+    if (t) out.unshift(t);
   }
-  return '(idle)';
+  return out.length ? out.join('\n') : '(idle)';
+}
+
+function humanAge(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 5)   return 'live';
+  if (s < 60)  return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  return `${Math.floor(s / 3600)}h`;
+}
+
+function statusLabel(s: string): string {
+  if (s === 'warn') return 'wait';   // user input wanted
+  if (s === 'err')  return 'err';
+  return '';                          // ok / running / idle = no label
 }
 </script>
 
@@ -109,35 +126,57 @@ function summarize(lines: string[]): string {
 .tile {
   background: var(--bg-alt); border: 1px solid var(--ink-faint); border-radius: 6px;
   padding: 10px; cursor: pointer;
-  min-width: 0;             /* prevent grid item from being widened by long preview content */
+  min-width: 0;
   overflow: hidden;
 }
 .tile:hover { border-color: var(--accent); }
-.tile.st-warn { border-color: var(--warn); }
-.tile.st-err { border-color: var(--err); }
+.tile.st-running { border-color: var(--accent); }
+.tile.st-warn { border-color: var(--warn); background: rgba(232, 184, 109, 0.06); }
+.tile.st-err  { border-color: var(--err);  background: rgba(217, 119, 102, 0.06); }
+.tile.st-idle { opacity: 0.7; }
+
 .tile header {
   display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 0; border: none;
   min-width: 0;
 }
-.tile-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: 0 0 8px; }
-.tile.st-warn .tile-dot { background: var(--warn); }
-.tile.st-err .tile-dot { background: var(--err); }
+.tile-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex: 0 0 8px; }
+.tile.st-running .tile-dot { background: var(--accent); }
+.tile.st-ok      .tile-dot { background: var(--accent); }
+.tile.st-warn    .tile-dot { background: var(--warn); }
+.tile.st-err     .tile-dot { background: var(--err); }
+.tile-dot.pulse {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 var(--warn); opacity: 1; }
+  50%      { box-shadow: 0 0 0 6px rgba(232, 184, 109, 0); opacity: 0.6; }
+}
+
 .tile-name {
   flex: 1; font-weight: 600; font-family: ui-monospace, monospace; font-size: 12px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
+.status-badge {
+  flex: 0 0 auto;
+  font: 10px ui-monospace, monospace;
+  padding: 1px 6px; border-radius: 8px;
+  background: var(--warn); color: #000;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.tile.st-err .status-badge { background: var(--err); }
 .age { color: var(--ink-faint); font: 11px ui-monospace, monospace; flex: 0 0 auto; }
 
 .preview-summary {
-  color: var(--ink-dim); font: 11px ui-monospace, monospace;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ink-dim); font: 11px/1.4 ui-monospace, monospace;
+  white-space: pre-wrap; word-break: break-all;
+  max-height: 60px; overflow: hidden; margin: 0;
 }
 .preview-full {
   color: var(--ink-dim); font: 11px ui-monospace, monospace; white-space: pre-wrap;
   max-height: 140px; overflow: hidden; margin: 8px 0 0; word-break: break-all;
 }
 
-/* Mobile: only one-line summary, hide the full preview block */
+/* Mobile: only summary, hide the full preview block */
 @media (max-width: 600px) {
   .preview-full { display: none; }
 }

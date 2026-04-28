@@ -27,7 +27,10 @@ export const DEFAULT_CONFIG: Config = {
     { name: 'clear', hint: 'clear screen', payload: 'clear\n' },
   ],
   statusRules: [
-    { match: '\\[y/N\\]|Apply edit\\?|Continue\\?', status: 'warn' },
+    // Claude Code waiting for user input: status bar shows 'Esc to cancel'
+    // (case-sensitive — distinct from the 'esc to interrupt' working banner).
+    // Y/N prompts, 'Apply edit?' style asks, and numbered menu choices too.
+    { match: 'Esc to cancel|\\[y/N\\]|Apply edit\\?|Continue\\?|❯ \\d\\.', status: 'warn' },
     { match: 'Error:|panic:|FATAL', status: 'err' },
     { match: '✓|passed|finished', status: 'ok' },
   ],
