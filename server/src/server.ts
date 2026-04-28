@@ -2,6 +2,7 @@ import Fastify, { FastifyInstance } from 'fastify';
 import { TmuxControl } from './tmux-control.js';
 import type { Config } from './config.schema.js';
 import { registerWindowsRoutes } from './routes/api.windows.js';
+import { registerButtonsRoutes } from './routes/api.buttons.js';
 import { registerPtyBridge } from './pty-bridge.js';
 import { registerWallChannel } from './wall-snapshots.js';
 
@@ -17,6 +18,7 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   app.decorate('cfg', cfg);
 
   await registerWindowsRoutes(app);
+  registerButtonsRoutes(app);
   await registerPtyBridge(app);
   registerWallChannel(app);
 
