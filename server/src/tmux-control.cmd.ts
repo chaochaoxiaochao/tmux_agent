@@ -49,3 +49,7 @@ export function parseSessionLine(line: string) {
   const [name, attached, windows] = line.split('|');
   return { name, attached: attached === '1', windowCount: Number(windows) };
 }
+
+export function newSession(name: string): string[] {
+  return ['new-session', '-d', '-s', name];
+}

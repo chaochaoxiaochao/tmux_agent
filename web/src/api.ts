@@ -16,6 +16,7 @@ async function http<T>(method: string, url: string, body?: any): Promise<T> {
 
 export const api = {
   sessions: () => http<SessionMeta[]>('GET', '/api/sessions'),
+  createSession: (name: string) => http<void>('POST', '/api/sessions', { name }),
   windows: () => http<WindowMeta[]>('GET', '/api/windows'),
   newWindow: (name?: string) => http<WindowMeta>('POST', '/api/windows', { name }),
   killWindow: (id: string) => http<void>('POST', `/api/windows/${encodeURIComponent(id)}/kill`),

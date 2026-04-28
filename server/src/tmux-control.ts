@@ -37,6 +37,7 @@ export class TmuxControl {
   }
 
   async listWindows(): Promise<WindowMeta[]> {
+    if (!await this.hasSession(this.opts.session)) return [];
     const { stdout } = await this.run(cmd.listWindows(this.opts.session));
     return stdout.trim().split('\n').filter(Boolean).map(cmd.parseWindowLine);
   }
@@ -72,6 +73,10 @@ export class TmuxControl {
       const { stdout } = await this.run(cmd.displayPaneCwd(this.opts.session, windowId));
       return stdout.trim() || null;
     } catch { return null; }
+  }
+
+  async newSession(name: string): Promise<void> {
+    await this.run(cmd.newSession(name));
   }
 }
 

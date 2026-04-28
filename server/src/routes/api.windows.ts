@@ -3,6 +3,13 @@ import { FastifyInstance } from 'fastify';
 export async function registerWindowsRoutes(app: FastifyInstance) {
   app.get('/api/sessions', async () => app.tmux.listSessions());
 
+  app.post<{ Body: { name: string } }>('/api/sessions', async (req, reply) => {
+    const name = req.body?.name;
+    if (!name) { reply.status(400).send({ error: 'bad_input', message: 'name required' }); return; }
+    await app.tmux.newSession(name);
+    reply.status(204).send();
+  });
+
   app.get('/api/windows', async () => app.tmux.listWindows());
 
   app.post<{ Body: { name?: string } }>('/api/windows', async (req) => {

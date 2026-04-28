@@ -2,6 +2,7 @@ import { loadConfig } from './config.js';
 import { buildServer } from './server.js';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { execFileSync } from 'node:child_process';
 
 export function loadConfigForMain(filePath: string) {
   return loadConfig(filePath);
@@ -23,6 +24,8 @@ function parseArgs(): { configPath: string } {
 
 export async function main() {
   const { configPath } = parseArgs();
+  try { execFileSync('tmux', ['-V'], { stdio: 'ignore' }); }
+  catch { console.error('tmux not found in PATH. Install tmux first.'); process.exit(1); }
   const cfg = loadConfigForMain(configPath);
   const app = await buildServer({ ...cfg, configPath } as any);
   await app.listen({ host: cfg.server.host, port: cfg.server.port });

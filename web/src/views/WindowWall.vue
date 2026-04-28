@@ -10,7 +10,10 @@
         </header>
         <pre class="preview">{{ w.preview.join('\n') }}</pre>
       </div>
-      <div v-if="windows.length === 0" class="empty">no windows · session may not exist · 启动 tmux session</div>
+      <div v-if="windows.length === 0 && status === 'open'" class="empty">
+        <p>no windows · session may not exist</p>
+        <button @click="createSession">create session</button>
+      </div>
     </div>
   </div>
 </template>
@@ -19,11 +22,13 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ReconnectingWS } from '../ws';
+import { api } from '../api';
 import type { WallSnapshotWindow } from '../types';
 
 const windows = ref<WallSnapshotWindow[]>([]);
 const status = ref<'connecting' | 'open' | 'closed'>('connecting');
 const router = useRouter();
+const sessionName = ref<string>('claude');
 
 const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/wall`;
 let ws: ReconnectingWS | null = null;
@@ -39,6 +44,10 @@ onMounted(() => {
 onUnmounted(() => ws?.close());
 
 function open(w: WallSnapshotWindow) { router.push(`/w/${encodeURIComponent(w.id)}`); }
+
+async function createSession() {
+  try { await api.createSession(sessionName.value); } catch (e: any) { alert(e.message); }
+}
 </script>
 
 <style scoped>
