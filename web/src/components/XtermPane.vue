@@ -95,4 +95,12 @@ watch(() => [props.session, props.windowId], () => connect());
   overflow: hidden;          /* never show internal scrollbars; FitAddon owns sizing */
   contain: strict;           /* don't let xterm's measure pass push parent layout */
 }
+
+/* On mobile (narrow screens), make the terminal area non-interactive so
+ * tapping it doesn't focus xterm's hidden textarea and pop the keyboard.
+ * User sends input via the top-bar '⌨ input' dialog instead.
+ * Desktop keeps full interactivity. */
+@media (max-width: 600px) {
+  .xterm-host { pointer-events: none; user-select: none; -webkit-user-select: none; }
+}
 </style>
