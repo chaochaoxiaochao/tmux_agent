@@ -26,7 +26,8 @@
             <span class="tile-name">{{ w.index }}: {{ w.name }}</span>
             <span class="age">{{ Math.round(w.lastOutputAgeMs / 1000) }}s</span>
           </header>
-          <pre class="preview">{{ w.preview.join('\n') }}</pre>
+          <div class="preview-summary">{{ summarize(w.preview) }}</div>
+          <pre class="preview-full">{{ w.preview.join('\n') }}</pre>
         </div>
         <div v-if="s.windows.length === 0" class="session-empty">no windows</div>
       </div>
@@ -74,10 +75,21 @@ async function newWindow(session: string) {
   try { await api.newWindow(session, name); }
   catch (e: any) { alert(e.message); }
 }
+
+// Pick the last non-blank line of preview as a one-line summary.
+// Most recent activity is the most informative on a small mobile tile.
+function summarize(lines: string[]): string {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const t = lines[i].trim();
+    if (t) return t;
+  }
+  return '(idle)';
+}
 </script>
 
 <style scoped>
-.wall { padding: 16px; }
+.wall { padding: 16px; box-sizing: border-box; }
+@media (max-width: 600px) { .wall { padding: 8px; } }
 .status-banner { color: var(--warn); font-size: 12px; margin-bottom: 8px; }
 
 .session { margin-bottom: 22px; }
@@ -94,19 +106,40 @@ async function newWindow(session: string) {
 .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
 
-.tile { background: var(--bg-alt); border: 1px solid var(--ink-faint); border-radius: 6px; padding: 10px; cursor: pointer; }
+.tile {
+  background: var(--bg-alt); border: 1px solid var(--ink-faint); border-radius: 6px;
+  padding: 10px; cursor: pointer;
+  min-width: 0;             /* prevent grid item from being widened by long preview content */
+  overflow: hidden;
+}
 .tile:hover { border-color: var(--accent); }
 .tile.st-warn { border-color: var(--warn); }
 .tile.st-err { border-color: var(--err); }
-.tile header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 0; border: none; }
-.tile-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.tile header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 0; border: none;
+  min-width: 0;
+}
+.tile-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: 0 0 8px; }
 .tile.st-warn .tile-dot { background: var(--warn); }
 .tile.st-err .tile-dot { background: var(--err); }
-.tile-name { flex: 1; font-weight: 600; font-family: ui-monospace, monospace; font-size: 12px; }
-.age { color: var(--ink-faint); font: 11px ui-monospace, monospace; }
-.preview {
+.tile-name {
+  flex: 1; font-weight: 600; font-family: ui-monospace, monospace; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.age { color: var(--ink-faint); font: 11px ui-monospace, monospace; flex: 0 0 auto; }
+
+.preview-summary {
+  color: var(--ink-dim); font: 11px ui-monospace, monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.preview-full {
   color: var(--ink-dim); font: 11px ui-monospace, monospace; white-space: pre-wrap;
-  max-height: 140px; overflow: hidden; margin: 0;
+  max-height: 140px; overflow: hidden; margin: 8px 0 0; word-break: break-all;
+}
+
+/* Mobile: only one-line summary, hide the full preview block */
+@media (max-width: 600px) {
+  .preview-full { display: none; }
 }
 
 .session-empty { color: var(--ink-faint); padding: 12px; }
