@@ -6,7 +6,7 @@
       <input v-model="newSessionName" placeholder="session name" />
       <button @click="createSession">create session</button>
     </div>
-    <section v-for="s in snap?.sessions ?? []" :key="s.name" class="session">
+    <section v-for="s in sortedSessions" :key="s.name" class="session">
       <header class="session-header">
         <span class="dot" :class="{ attached: s.attached }"></span>
         <span class="name">{{ s.name }}</span>
@@ -15,7 +15,7 @@
       </header>
       <div class="grid">
         <div
-          v-for="w in s.windows"
+          v-for="w in sortedWindows(s.windows)"
           :key="`${s.name}:${w.id}`"
           class="tile"
           :class="[
@@ -41,16 +41,57 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ReconnectingWS } from '../ws';
 import { api } from '../api';
-import type { WallSnapshot, WallSnapshotWindow } from '../types';
+import type { WallSnapshot, WallSnapshotSession, WallSnapshotWindow } from '../types';
 
 const snap = ref<WallSnapshot | null>(null);
 const status = ref<'connecting' | 'open' | 'closed'>('connecting');
 const router = useRouter();
 const newSessionName = ref<string>('claude');
+
+// Sort key for a window: lower = more interesting / earlier in list.
+// 1. attention (INPUT/DONE pulsing) wins — push to top
+// 2. then by lastOutputAgeMs ascending (live before idle)
+// 3. tiebreak by tmux window index (preserve native order)
+function windowSortKey(w: WallSnapshotWindow): [number, number, number] {
+  const attentionRank = w.attention ? 0 : 1;
+  return [attentionRank, w.lastOutputAgeMs, w.index];
+}
+function compareTuple(a: number[], b: number[]): number {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+}
+
+function sortedWindows(ws: WallSnapshotWindow[]): WallSnapshotWindow[] {
+  return [...ws].sort((a, b) => compareTuple(windowSortKey(a), windowSortKey(b)));
+}
+
+// Sort key for a session: lower = earlier in list.
+// 1. has any window with attention -> top
+// 2. then by min lastOutputAgeMs across the session (most-recent activity)
+// 3. tiebreak by name for stability
+function sessionSortKey(s: WallSnapshotSession): [number, number, string] {
+  const hasAttention = s.windows.some(w => !!w.attention) ? 0 : 1;
+  const minAge = s.windows.length
+    ? Math.min(...s.windows.map(w => w.lastOutputAgeMs))
+    : Number.POSITIVE_INFINITY;
+  return [hasAttention, minAge, s.name];
+}
+function compareSession(a: WallSnapshotSession, b: WallSnapshotSession): number {
+  const [aA, aB, aC] = sessionSortKey(a);
+  const [bA, bB, bC] = sessionSortKey(b);
+  if (aA !== bA) return aA - bA;
+  if (aB !== bB) return aB - bB;
+  return aC.localeCompare(bC);
+}
+
+const sortedSessions = computed(() => {
+  if (!snap.value) return [];
+  return [...snap.value.sessions].sort(compareSession);
+});
 
 const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/wall`;
 let ws: ReconnectingWS | null = null;
