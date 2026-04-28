@@ -56,21 +56,6 @@ onMounted(() => {
   ro = new ResizeObserver(() => { fit?.fit(); sendResize(); });
   ro.observe(root.value);
 
-  // When xterm's hidden textarea gets focus on mobile, scroll it into view so
-  // it isn't covered by the soft keyboard. xterm 5.x renders a textarea inside
-  // root with class .xterm-helper-textarea.
-  const helper = root.value.querySelector('textarea.xterm-helper-textarea') as HTMLTextAreaElement | null;
-  if (helper) {
-    const scrollUp = () => {
-      requestAnimationFrame(() => setTimeout(() => {
-        root.value?.scrollIntoView({ block: 'end', behavior: 'smooth' });
-      }, 50));
-    };
-    helper.addEventListener('focus', () => {
-      scrollUp();
-      setTimeout(scrollUp, 350);
-    });
-  }
 });
 
 onUnmounted(() => {
