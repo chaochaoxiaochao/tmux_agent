@@ -6,9 +6,16 @@ import { registerButtonsRoutes } from './routes/api.buttons.js';
 import { registerCompletionRoutes } from './routes/api.completion.js';
 import { registerPtyBridge } from './pty-bridge.js';
 import { registerWallChannel } from './wall-snapshots.js';
+import fastifyStatic from '@fastify/static';
+import * as path from 'node:path';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export interface ExtendedConfig extends Config {
   tmux: Config['tmux'] & { socket?: string };
+  configPath?: string;
 }
 
 export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance> {
@@ -23,6 +30,11 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   registerCompletionRoutes(app);
   await registerPtyBridge(app);
   registerWallChannel(app);
+
+  const webDist = path.resolve(__dirname, '../../web/dist');
+  if (existsSync(webDist)) {
+    await app.register(fastifyStatic, { root: webDist, prefix: '/' });
+  }
 
   app.setErrorHandler((err, _req, reply) => {
     const status = (err as any).statusCode ?? 500;
