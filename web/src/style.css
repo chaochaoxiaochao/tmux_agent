@@ -4,7 +4,7 @@
   --accent: #9bd28b; --warn: #e8b86d; --err: #d97766;
 }
 * { box-sizing: border-box; }
-html, body, #app { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px system-ui, -apple-system, sans-serif; }
+html, body, #app { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px system-ui, -apple-system, sans-serif; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .app-root { display: flex; flex-direction: column; height: 100%; }
 button { background: var(--bg-alt); color: var(--ink); border: 1px solid var(--ink-faint); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
 button:hover { border-color: var(--accent); }
