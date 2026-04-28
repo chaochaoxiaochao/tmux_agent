@@ -9,7 +9,6 @@
       <StatusPanel :window-id="id" :title="`${session} : ${id}`" />
     </div>
     <ScrollControls :session="session" :window-id="id" />
-    <InputBar @send="onSend" />
     <FixedButtonBar @send="onSend" />
   </div>
 </template>
@@ -18,7 +17,6 @@
 import XtermPane from '../components/XtermPane.vue';
 import StatusPanel from '../components/StatusPanel.vue';
 import ScrollControls from '../components/ScrollControls.vue';
-import InputBar from '../components/InputBar.vue';
 import FixedButtonBar from '../components/FixedButtonBar.vue';
 import { api } from '../api';
 
