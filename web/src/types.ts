@@ -5,11 +5,13 @@ export interface CommandItem { name: string; hint: string; payload: string }
 export interface FileItem { kind: 'file'; path: string; mtime: number }
 export interface CommandSuggestion { kind: 'command'; name: string; hint: string; payload: string }
 export type CompletionItem = FileItem | CommandSuggestion;
+export type AttentionKind = 'input-needed' | 'done';
 export interface WallSnapshotWindow extends WindowMeta {
   session: string;
   preview: string[];
   status: 'ok' | 'warn' | 'err' | 'running' | 'idle';
   lastOutputAgeMs: number;
+  attention?: AttentionKind;
 }
 export interface WallSnapshotSession {
   name: string;

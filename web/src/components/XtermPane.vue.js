@@ -18,6 +18,12 @@ function sendResize() {
         return;
     ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
 }
+function refit() {
+    if (!fit || !term)
+        return;
+    fit.fit();
+    sendResize();
+}
 function connect() {
     ws?.close();
     ws = new ReconnectingWS(wsUrl(props.session, props.windowId), {
@@ -26,8 +32,14 @@ function connect() {
                 term?.write(new Uint8Array(data));
         },
     });
-    setTimeout(sendResize, 200);
+    // Layout often isn't fully stable on first paint (font metrics still
+    // loading, dvh adjusting after attach view mounts). Re-fit a few times
+    // so xterm reaches its final cols/rows before tmux locks in pane size.
+    setTimeout(refit, 100);
+    setTimeout(refit, 400);
+    setTimeout(refit, 1000);
 }
+const onWinResize = () => refit();
 onMounted(() => {
     if (!root.value)
         return;
@@ -45,9 +57,17 @@ onMounted(() => {
     term.onData(d => ws?.send(new TextEncoder().encode(d)));
     ro = new ResizeObserver(() => { fit?.fit(); sendResize(); });
     ro.observe(root.value);
+    // Some browsers don't fire ResizeObserver on the host when only ancestor
+    // sizes change (e.g. visualViewport shrinks for keyboard). Hook those too.
+    window.addEventListener('resize', onWinResize);
+    window.addEventListener('orientationchange', onWinResize);
+    window.visualViewport?.addEventListener?.('resize', onWinResize);
 });
 onUnmounted(() => {
     ro?.disconnect();
+    window.removeEventListener('resize', onWinResize);
+    window.removeEventListener('orientationchange', onWinResize);
+    window.visualViewport?.removeEventListener?.('resize', onWinResize);
     ws?.close();
     term?.dispose();
 });
@@ -56,6 +76,7 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['xterm-host']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({

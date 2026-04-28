@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { evaluateStatus, WindowStatus } from './status-rules.js';
+import { getAttention, AttentionKind } from './attention.js';
 
 export interface WallWindow {
   session: string;
@@ -7,6 +8,7 @@ export interface WallWindow {
   preview: string[];
   status: WindowStatus;
   lastOutputAgeMs: number;
+  attention?: AttentionKind;
 }
 export interface WallSession {
   name: string;
@@ -43,7 +45,8 @@ export function registerWallChannel(app: FastifyInstance) {
           if (!prev || prev.hash !== hash) lastSeen.set(key, { hash, ts });
           const lastOutputAgeMs = ts - (lastSeen.get(key)!.ts);
           const status = evaluateStatus(preview, app.cfg.statusRules, lastOutputAgeMs);
-          windows.push({ session: s.name, ...w, preview, status, lastOutputAgeMs });
+          const attention = getAttention(s.name, w.id)?.kind;
+          windows.push({ session: s.name, ...w, preview, status, lastOutputAgeMs, attention });
         }
         out.push({ name: s.name, attached: s.attached, windows });
       }

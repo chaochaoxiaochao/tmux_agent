@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import XtermPane from '../components/XtermPane.vue';
 import StatusPanel from '../components/StatusPanel.vue';
 import ScrollControls from '../components/ScrollControls.vue';
@@ -32,6 +32,14 @@ async function onSend(payload: string) {
   try { await api.send(props.session, props.id, payload); }
   catch (e: any) { alert(e.message); }
 }
+
+// Visiting a window acks any pending attention notification for it
+// (Claude Code Notification/Stop hooks). The wall stops pulsing it.
+function ackAttention() {
+  api.clearAttention(props.session, props.id).catch(() => { /* best effort */ });
+}
+onMounted(ackAttention);
+watch(() => [props.session, props.id], ackAttention);
 </script>
 
 <style scoped>

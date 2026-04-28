@@ -33,6 +33,8 @@ export const api = {
     http<void>('POST', `${wbase(session)}/${enc(id)}/send`, { text }),
   copyMode: (session: string, id: string) =>
     http<void>('POST', `${wbase(session)}/${enc(id)}/copy-mode`),
+  clearAttention: (session: string, windowId: string) =>
+    http<void>('POST', '/api/notify/clear', { session, windowId }),
   sendKey: (session: string, id: string, key: string) =>
     http<void>('POST', `${wbase(session)}/${enc(id)}/key`, { key }),
 

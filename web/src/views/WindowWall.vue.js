@@ -40,10 +40,40 @@ async function newWindow(session) {
         alert(e.message);
     }
 }
+// Pick the last few non-blank lines of preview as a multi-line summary.
+// On mobile we show this in place of the full preview, so 3 lines is a
+// useful glance: usually shows the prompt + last command output.
+function summarize(lines) {
+    const out = [];
+    for (let i = lines.length - 1; i >= 0 && out.length < 3; i--) {
+        const t = lines[i].replace(/\s+$/, '');
+        if (t)
+            out.unshift(t);
+    }
+    return out.length ? out.join('\n') : '(idle)';
+}
+function humanAge(ms) {
+    const s = Math.round(ms / 1000);
+    if (s < 5)
+        return 'live';
+    if (s < 60)
+        return `${s}s`;
+    if (s < 3600)
+        return `${Math.floor(s / 60)}m`;
+    return `${Math.floor(s / 3600)}h`;
+}
+function statusLabel(s) {
+    if (s === 'warn')
+        return 'wait'; // user input wanted
+    if (s === 'err')
+        return 'err';
+    return ''; // ok / running / idle = no label
+}
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['wall']} */ ;
 /** @type {__VLS_StyleScopedClasses['dot']} */ ;
 /** @type {__VLS_StyleScopedClasses['grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['tile']} */ ;
@@ -51,11 +81,31 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['tile']} */ ;
 /** @type {__VLS_StyleScopedClasses['tile']} */ ;
 /** @type {__VLS_StyleScopedClasses['tile']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile']} */ ;
+/** @type {__VLS_StyleScopedClasses['attn-done']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile']} */ ;
+/** @type {__VLS_StyleScopedClasses['st-running']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile-dot']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile-dot']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile']} */ ;
 /** @type {__VLS_StyleScopedClasses['st-warn']} */ ;
 /** @type {__VLS_StyleScopedClasses['tile-dot']} */ ;
 /** @type {__VLS_StyleScopedClasses['tile']} */ ;
 /** @type {__VLS_StyleScopedClasses['st-err']} */ ;
 /** @type {__VLS_StyleScopedClasses['tile-dot']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile-dot']} */ ;
+/** @type {__VLS_StyleScopedClasses['tile']} */ ;
+/** @type {__VLS_StyleScopedClasses['st-err']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['attn']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['done']} */ ;
+/** @type {__VLS_StyleScopedClasses['preview-full']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
@@ -118,23 +168,47 @@ for (const [s] of __VLS_getVForSourceType((__VLS_ctx.snap?.sessions ?? []))) {
                 } },
             key: (`${s.name}:${w.id}`),
             ...{ class: "tile" },
-            ...{ class: (['st-' + w.status]) },
+            ...{ class: ([
+                    'st-' + w.status,
+                    w.attention ? 'attn-' + w.attention : null,
+                ]) },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({});
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "tile-dot" },
+            ...{ class: ({ pulse: !!w.attention || w.status === 'warn' }) },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "tile-name" },
         });
         (w.index);
         (w.name);
+        if (w.attention === 'input-needed') {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "status-badge attn" },
+            });
+        }
+        else if (w.attention === 'done') {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "status-badge done" },
+            });
+        }
+        else if (__VLS_ctx.statusLabel(w.status)) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "status-badge" },
+            });
+            (__VLS_ctx.statusLabel(w.status));
+        }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "age" },
         });
-        (Math.round(w.lastOutputAgeMs / 1000));
+        (__VLS_ctx.humanAge(w.lastOutputAgeMs));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.pre, __VLS_intrinsicElements.pre)({
-            ...{ class: "preview" },
+            ...{ class: "preview-summary" },
+        });
+        (__VLS_ctx.summarize(w.preview));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.pre, __VLS_intrinsicElements.pre)({
+            ...{ class: "preview-full" },
         });
         (w.preview.join('\n'));
     }
@@ -157,8 +231,14 @@ for (const [s] of __VLS_getVForSourceType((__VLS_ctx.snap?.sessions ?? []))) {
 /** @type {__VLS_StyleScopedClasses['tile']} */ ;
 /** @type {__VLS_StyleScopedClasses['tile-dot']} */ ;
 /** @type {__VLS_StyleScopedClasses['tile-name']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['attn']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['done']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['age']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['preview-summary']} */ ;
+/** @type {__VLS_StyleScopedClasses['preview-full']} */ ;
 /** @type {__VLS_StyleScopedClasses['session-empty']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
@@ -170,6 +250,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             open: open,
             createSession: createSession,
             newWindow: newWindow,
+            summarize: summarize,
+            humanAge: humanAge,
+            statusLabel: statusLabel,
         };
     },
 });

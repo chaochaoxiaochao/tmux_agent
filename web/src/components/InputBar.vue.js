@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import MentionPicker from './MentionPicker.vue';
 import { api } from '../api';
 const text = ref('');
@@ -7,6 +7,39 @@ const items = ref([]);
 const active = ref(0);
 const triggerChar = ref(null);
 const inputEl = ref(null);
+const wrapEl = ref(null);
+// On mobile, when the on-screen keyboard appears the visualViewport shrinks.
+// Whenever it resizes (keyboard show/hide/rotate), make sure the input bar
+// stays above the keyboard.
+function ensureInputVisible() {
+    if (!wrapEl.value)
+        return;
+    // Use rAF + small timeout so layout has stabilized after keyboard animation.
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            wrapEl.value?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+        }, 50);
+    });
+}
+function onFocus() {
+    // Initial focus: keyboard may take ~300ms to appear, retry once.
+    ensureInputVisible();
+    setTimeout(ensureInputVisible, 350);
+}
+const onViewportResize = () => {
+    // Only react if the input is the active element — avoids fighting the user
+    // when the keyboard hides and they're scrolling around the terminal.
+    if (document.activeElement === inputEl.value)
+        ensureInputVisible();
+};
+onMounted(() => {
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', onViewportResize);
+});
+onUnmounted(() => {
+    const vv = window.visualViewport;
+    vv?.removeEventListener('resize', onViewportResize);
+});
 const emit = defineEmits();
 function send() {
     if (!text.value)
@@ -111,8 +144,10 @@ let __VLS_directives;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ref: "wrapEl",
     ...{ class: "inputbar-wrap" },
 });
+/** @type {typeof __VLS_ctx.wrapEl} */ ;
 /** @type {[typeof MentionPicker, ]} */ ;
 // @ts-ignore
 const __VLS_0 = __VLS_asFunctionalComponent(MentionPicker, new MentionPicker({
@@ -137,6 +172,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ onKeydown: (__VLS_ctx.onKey) },
+    ...{ onFocus: (__VLS_ctx.onFocus) },
     ref: "inputEl",
     placeholder: "type or 🎤 ...",
 });
@@ -164,6 +200,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             items: items,
             active: active,
             inputEl: inputEl,
+            wrapEl: wrapEl,
+            onFocus: onFocus,
             send: send,
             pick: pick,
             onKey: onKey,

@@ -26,6 +26,7 @@ export const api = {
     killAll: (session) => http('POST', `${wbase(session)}/kill-all`),
     send: (session, id, text) => http('POST', `${wbase(session)}/${enc(id)}/send`, { text }),
     copyMode: (session, id) => http('POST', `${wbase(session)}/${enc(id)}/copy-mode`),
+    clearAttention: (session, windowId) => http('POST', '/api/notify/clear', { session, windowId }),
     sendKey: (session, id, key) => http('POST', `${wbase(session)}/${enc(id)}/key`, { key }),
     // buttons (global)
     buttons: () => http('GET', '/api/buttons'),

@@ -18,13 +18,18 @@
           v-for="w in s.windows"
           :key="`${s.name}:${w.id}`"
           class="tile"
-          :class="['st-' + w.status]"
+          :class="[
+            'st-' + w.status,
+            w.attention ? 'attn-' + w.attention : null,
+          ]"
           @click="open(s.name, w)"
         >
           <header>
-            <span class="tile-dot" :class="{ pulse: w.status === 'warn' }"></span>
+            <span class="tile-dot" :class="{ pulse: !!w.attention || w.status === 'warn' }"></span>
             <span class="tile-name">{{ w.index }}: {{ w.name }}</span>
-            <span class="status-badge" v-if="statusLabel(w.status)">{{ statusLabel(w.status) }}</span>
+            <span class="status-badge attn" v-if="w.attention === 'input-needed'">INPUT</span>
+            <span class="status-badge done" v-else-if="w.attention === 'done'">DONE</span>
+            <span class="status-badge" v-else-if="statusLabel(w.status)">{{ statusLabel(w.status) }}</span>
             <span class="age">{{ humanAge(w.lastOutputAgeMs) }}</span>
           </header>
           <pre class="preview-summary">{{ summarize(w.preview) }}</pre>
@@ -134,6 +139,32 @@ function statusLabel(s: string): string {
 .tile.st-warn { border-color: var(--warn); background: rgba(232, 184, 109, 0.06); }
 .tile.st-err  { border-color: var(--err);  background: rgba(217, 119, 102, 0.06); }
 .tile.st-idle { opacity: 0.7; }
+/* Attention from external hooks (Claude Code Notification/Stop) overrides
+ * the rule-based color so it's clearly visible. */
+.tile.attn-input-needed {
+  border-color: var(--warn);
+  background: rgba(232, 184, 109, 0.14);
+  opacity: 1;
+  animation: tile-pulse 1.4s ease-in-out infinite;
+}
+.tile.attn-done {
+  border-color: #6db3e8;       /* a calm blue, distinct from warn yellow */
+  background: rgba(109, 179, 232, 0.10);
+  opacity: 1;
+  animation: tile-pulse 1.4s ease-in-out infinite;
+}
+@keyframes tile-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 184, 109, 0.5); }
+  50%      { box-shadow: 0 0 0 8px rgba(232, 184, 109, 0); }
+}
+.tile.attn-done {
+  /* override pulse color for done state */
+  animation-name: tile-pulse-done;
+}
+@keyframes tile-pulse-done {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(109, 179, 232, 0.5); }
+  50%      { box-shadow: 0 0 0 8px rgba(109, 179, 232, 0); }
+}
 
 .tile header {
   display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 0; border: none;
@@ -163,7 +194,9 @@ function statusLabel(s: string): string {
   background: var(--warn); color: #000;
   text-transform: uppercase; letter-spacing: 0.5px;
 }
-.tile.st-err .status-badge { background: var(--err); }
+.tile.st-err .status-badge:not(.done):not(.attn) { background: var(--err); }
+.status-badge.attn { background: var(--warn); }
+.status-badge.done { background: #6db3e8; }
 .age { color: var(--ink-faint); font: 11px ui-monospace, monospace; flex: 0 0 auto; }
 
 .preview-summary {
