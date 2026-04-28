@@ -1,8 +1,14 @@
 <template>
-  <div class="inputbar-wrap">
+  <div ref="wrapEl" class="inputbar-wrap">
     <MentionPicker :items="items" :active="active" @pick="pick" />
     <div class="inputbar">
-      <input ref="inputEl" v-model="text" @keydown="onKey" placeholder="type or 🎤 ..." />
+      <input
+        ref="inputEl"
+        v-model="text"
+        @keydown="onKey"
+        @focus="onFocus"
+        placeholder="type or 🎤 ..."
+      />
       <button @click="toggleVoice" :class="{ rec: recording }">{{ recording ? '● rec' : '🎤' }}</button>
       <button class="send" @click="send">send ⏎</button>
     </div>
@@ -10,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import MentionPicker from './MentionPicker.vue';
 import { api } from '../api';
 import type { CompletionItem } from '../types';
@@ -21,6 +27,41 @@ const items = ref<CompletionItem[]>([]);
 const active = ref(0);
 const triggerChar = ref<'@' | '/' | null>(null);
 const inputEl = ref<HTMLInputElement | null>(null);
+const wrapEl = ref<HTMLDivElement | null>(null);
+
+// On mobile, when the on-screen keyboard appears the visualViewport shrinks.
+// Whenever it resizes (keyboard show/hide/rotate), make sure the input bar
+// stays above the keyboard.
+function ensureInputVisible() {
+  if (!wrapEl.value) return;
+  // Use rAF + small timeout so layout has stabilized after keyboard animation.
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      wrapEl.value?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    }, 50);
+  });
+}
+
+function onFocus() {
+  // Initial focus: keyboard may take ~300ms to appear, retry once.
+  ensureInputVisible();
+  setTimeout(ensureInputVisible, 350);
+}
+
+const onViewportResize = () => {
+  // Only react if the input is the active element — avoids fighting the user
+  // when the keyboard hides and they're scrolling around the terminal.
+  if (document.activeElement === inputEl.value) ensureInputVisible();
+};
+
+onMounted(() => {
+  const vv = (window as any).visualViewport as VisualViewport | undefined;
+  vv?.addEventListener('resize', onViewportResize);
+});
+onUnmounted(() => {
+  const vv = (window as any).visualViewport as VisualViewport | undefined;
+  vv?.removeEventListener('resize', onViewportResize);
+});
 
 const emit = defineEmits<{ (e: 'send', payload: string): void }>();
 
