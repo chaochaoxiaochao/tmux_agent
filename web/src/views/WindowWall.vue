@@ -1,5 +1,6 @@
 <template>
   <div class="wall">
+    <SessionRow />
     <div v-if="status !== 'open'" class="status-banner">● {{ status }}</div>
     <div class="grid">
       <div v-for="w in windows" :key="w.id" class="tile" :class="['st-' + w.status]" @click="open(w)">
@@ -21,6 +22,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import SessionRow from '../components/SessionRow.vue';
 import { ReconnectingWS } from '../ws';
 import { api } from '../api';
 import type { WallSnapshotWindow } from '../types';
