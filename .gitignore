@@ -2,3 +2,13 @@ node_modules/
 **/dist/
 *.log
 .DS_Store
+
+# Design canvas exports — keep out of source tree
+.design-canvas.state.json
+*.zip
+extracted/
+*.png
+
+# vue-tsc emits stub .vue.js next to .vue files; we don't track these
+web/src/**/*.vue.js
+web/tsconfig.tsbuildinfo
