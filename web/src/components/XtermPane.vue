@@ -47,6 +47,8 @@ function connect() {
   setTimeout(refit, 1000);
 }
 
+const onWinResize = () => refit();
+
 onMounted(() => {
   if (!root.value) return;
   term = new Terminal({
@@ -66,11 +68,18 @@ onMounted(() => {
 
   ro = new ResizeObserver(() => { fit?.fit(); sendResize(); });
   ro.observe(root.value);
-
+  // Some browsers don't fire ResizeObserver on the host when only ancestor
+  // sizes change (e.g. visualViewport shrinks for keyboard). Hook those too.
+  window.addEventListener('resize', onWinResize);
+  window.addEventListener('orientationchange', onWinResize);
+  (window as any).visualViewport?.addEventListener?.('resize', onWinResize);
 });
 
 onUnmounted(() => {
   ro?.disconnect();
+  window.removeEventListener('resize', onWinResize);
+  window.removeEventListener('orientationchange', onWinResize);
+  (window as any).visualViewport?.removeEventListener?.('resize', onWinResize);
   ws?.close();
   term?.dispose();
 });
@@ -79,5 +88,11 @@ watch(() => [props.session, props.windowId], () => connect());
 </script>
 
 <style scoped>
-.xterm-host { width: 100%; height: 100%; padding: 4px 6px; box-sizing: border-box; background: #000; }
+.xterm-host {
+  width: 100%; height: 100%;
+  padding: 4px 6px; box-sizing: border-box;
+  background: #000;
+  overflow: hidden;          /* never show internal scrollbars; FitAddon owns sizing */
+  contain: strict;           /* don't let xterm's measure pass push parent layout */
+}
 </style>
