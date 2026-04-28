@@ -10,11 +10,10 @@ export interface SessionMeta { name: string; attached: boolean; windowCount: num
 
 export interface TmuxControlOpts {
   socket?: string;
-  session: string;
 }
 
 export class TmuxControl {
-  constructor(private opts: TmuxControlOpts) {}
+  constructor(private opts: TmuxControlOpts = {}) {}
 
   private async run(argv: string[]): Promise<{ stdout: string; stderr: string }> {
     const prefix = this.opts.socket ? ['-L', this.opts.socket] : [];
@@ -27,8 +26,12 @@ export class TmuxControl {
   }
 
   async listSessions(): Promise<SessionMeta[]> {
-    const { stdout } = await this.run(cmd.listSessions());
-    return stdout.trim().split('\n').filter(Boolean).map(cmd.parseSessionLine);
+    try {
+      const { stdout } = await this.run(cmd.listSessions());
+      return stdout.trim().split('\n').filter(Boolean).map(cmd.parseSessionLine);
+    } catch {
+      return [];
+    }
   }
 
   async hasSession(name: string): Promise<boolean> {
@@ -36,41 +39,41 @@ export class TmuxControl {
     catch { return false; }
   }
 
-  async listWindows(): Promise<WindowMeta[]> {
-    if (!await this.hasSession(this.opts.session)) return [];
-    const { stdout } = await this.run(cmd.listWindows(this.opts.session));
+  async listWindows(session: string): Promise<WindowMeta[]> {
+    if (!await this.hasSession(session)) return [];
+    const { stdout } = await this.run(cmd.listWindows(session));
     return stdout.trim().split('\n').filter(Boolean).map(cmd.parseWindowLine);
   }
 
-  async capturePane(windowId: string, lines = 8): Promise<string[]> {
-    const { stdout } = await this.run(cmd.capturePane(this.opts.session, windowId, lines));
+  async capturePane(session: string, windowId: string, lines = 8): Promise<string[]> {
+    const { stdout } = await this.run(cmd.capturePane(session, windowId, lines));
     return stdout.replace(/\n$/, '').split('\n');
   }
 
-  async newWindow(name?: string): Promise<WindowMeta> {
-    const { stdout } = await this.run(cmd.newWindow(this.opts.session, name));
+  async newWindow(session: string, name?: string): Promise<WindowMeta> {
+    const { stdout } = await this.run(cmd.newWindow(session, name));
     return cmd.parseWindowLine(stdout.trim());
   }
 
-  async splitWindow(windowId: string, dir: 'h' | 'v'): Promise<void> {
-    await this.run(cmd.splitWindow(this.opts.session, windowId, dir));
+  async splitWindow(session: string, windowId: string, dir: 'h' | 'v'): Promise<void> {
+    await this.run(cmd.splitWindow(session, windowId, dir));
   }
 
-  async killWindow(windowId: string): Promise<void> {
-    await this.run(cmd.killWindow(this.opts.session, windowId));
+  async killWindow(session: string, windowId: string): Promise<void> {
+    await this.run(cmd.killWindow(session, windowId));
   }
 
-  async sendKeys(windowId: string, text: string): Promise<void> {
+  async sendKeys(session: string, windowId: string, text: string): Promise<void> {
     const segs = sliceSendKeys(text);
     for (const seg of segs) {
-      const argv = sendKeysArgv(this.opts.session, windowId, seg);
+      const argv = sendKeysArgv(session, windowId, seg);
       await this.run(argv);
     }
   }
 
-  async paneCwd(windowId: string): Promise<string | null> {
+  async paneCwd(session: string, windowId: string): Promise<string | null> {
     try {
-      const { stdout } = await this.run(cmd.displayPaneCwd(this.opts.session, windowId));
+      const { stdout } = await this.run(cmd.displayPaneCwd(session, windowId));
       return stdout.trim() || null;
     } catch { return null; }
   }

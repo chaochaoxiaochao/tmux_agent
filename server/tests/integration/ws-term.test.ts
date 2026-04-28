@@ -7,12 +7,13 @@ import type { FastifyInstance } from 'fastify';
 let fx: TmuxFixture;
 let app: FastifyInstance;
 let port: number;
+const S = 'test';
 
 beforeEach(async () => {
   fx = startTmux();
   app = await buildServer({
     server: { host: '127.0.0.1', port: 0 },
-    tmux: { session: fx.session, cwdFallback: '/tmp', socket: fx.socket } as any,
+    tmux: { session: '', cwdFallback: '/tmp', socket: fx.socket } as any,
     ui: { accent: 'green', density: 'comfortable' },
     buttons: [], commands: [], statusRules: [],
     log: { level: 'info', file: '/tmp/tmux-agent-test.log' },
@@ -22,11 +23,11 @@ beforeEach(async () => {
 });
 afterEach(async () => { await app.close(); fx.cleanup(); });
 
-describe('/ws/term/:id', () => {
+describe('/ws/term/:session/:id', () => {
   it('echoes a typed command back via PTY', async () => {
-    const ws = (await app.inject({ method: 'GET', url: '/api/windows' })).json();
+    const ws = (await app.inject({ method: 'GET', url: `/api/sessions/${S}/windows` })).json();
     const id = ws[0].id;
-    const sock = new WebSocket(`ws://127.0.0.1:${port}/ws/term/${encodeURIComponent(id)}`);
+    const sock = new WebSocket(`ws://127.0.0.1:${port}/ws/term/${S}/${encodeURIComponent(id)}`);
     let buf = '';
     await new Promise<void>((resolve, reject) => {
       const t = setTimeout(() => reject(new Error('timeout: buf=' + buf.slice(-200))), 8000);

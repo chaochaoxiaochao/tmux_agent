@@ -2,47 +2,59 @@ import type { FastifyInstance } from 'fastify';
 import { evaluateStatus, WindowStatus } from './status-rules.js';
 
 export interface WallWindow {
+  session: string;
   id: string; index: number; name: string; active: boolean; panes: number;
   preview: string[];
   status: WindowStatus;
   lastOutputAgeMs: number;
 }
-export interface WallSnapshot { ts: number; windows: WallWindow[] }
+export interface WallSession {
+  name: string;
+  attached: boolean;
+  windows: WallWindow[];
+}
+export interface WallSnapshot { ts: number; sessions: WallSession[] }
 
 export function registerWallChannel(app: FastifyInstance) {
   const subscribers = new Set<any>();
   let timer: NodeJS.Timeout | null = null;
-  const lastSeen = new Map<string, { hash: string; ts: number }>();
+  const lastSeen = new Map<string, { hash: string; ts: number }>();   // key = "session:windowId"
 
   async function tick() {
     const start = Date.now();
     let snap: WallSnapshot;
     try {
-      const ws = await app.tmux.listWindows();
-      const windows: WallWindow[] = [];
-      for (const w of ws) {
-        let preview: string[] = [];
-        try { preview = await app.tmux.capturePane(w.id, 8); }
-        catch {
-          windows.push({ ...w, preview: [], status: 'err', lastOutputAgeMs: 0 });
-          continue;
+      const sessions = await app.tmux.listSessions();
+      const out: WallSession[] = [];
+      for (const s of sessions) {
+        const ws = await app.tmux.listWindows(s.name);
+        const windows: WallWindow[] = [];
+        for (const w of ws) {
+          const key = `${s.name}:${w.id}`;
+          let preview: string[] = [];
+          try { preview = await app.tmux.capturePane(s.name, w.id, 8); }
+          catch {
+            windows.push({ session: s.name, ...w, preview: [], status: 'err', lastOutputAgeMs: 0 });
+            continue;
+          }
+          const hash = preview.join('\n');
+          const prev = lastSeen.get(key);
+          const ts = Date.now();
+          if (!prev || prev.hash !== hash) lastSeen.set(key, { hash, ts });
+          const lastOutputAgeMs = ts - (lastSeen.get(key)!.ts);
+          const status = evaluateStatus(preview, app.cfg.statusRules, lastOutputAgeMs);
+          windows.push({ session: s.name, ...w, preview, status, lastOutputAgeMs });
         }
-        const hash = preview.join('\n');
-        const prev = lastSeen.get(w.id);
-        const ts = Date.now();
-        if (!prev || prev.hash !== hash) lastSeen.set(w.id, { hash, ts });
-        const lastOutputAgeMs = ts - (lastSeen.get(w.id)!.ts);
-        const status = evaluateStatus(preview, app.cfg.statusRules, lastOutputAgeMs);
-        windows.push({ ...w, preview, status, lastOutputAgeMs });
+        out.push({ name: s.name, attached: s.attached, windows });
       }
-      snap = { ts: Date.now(), windows };
+      snap = { ts: Date.now(), sessions: out };
     } catch {
-      snap = { ts: Date.now(), windows: [] };
+      snap = { ts: Date.now(), sessions: [] };
     }
     const payload = JSON.stringify({ type: 'snapshot', payload: snap });
     for (const s of subscribers) { try { s.send(payload); } catch { /* dead */ } }
     const elapsed = Date.now() - start;
-    const next = elapsed > 1000 ? 2000 : 1000;
+    const next = elapsed > 1500 ? 2500 : 1000;
     if (subscribers.size > 0) timer = setTimeout(tick, next);
     else timer = null;
   }

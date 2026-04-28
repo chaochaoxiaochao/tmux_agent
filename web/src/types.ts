@@ -6,9 +6,15 @@ export interface FileItem { kind: 'file'; path: string; mtime: number }
 export interface CommandSuggestion { kind: 'command'; name: string; hint: string; payload: string }
 export type CompletionItem = FileItem | CommandSuggestion;
 export interface WallSnapshotWindow extends WindowMeta {
+  session: string;
   preview: string[];
   status: 'ok' | 'warn' | 'err' | 'running' | 'idle';
   lastOutputAgeMs: number;
 }
-export interface WallSnapshot { ts: number; windows: WallSnapshotWindow[] }
+export interface WallSnapshotSession {
+  name: string;
+  attached: boolean;
+  windows: WallSnapshotWindow[];
+}
+export interface WallSnapshot { ts: number; sessions: WallSnapshotSession[] }
 export interface UiConfig { accent: string; density: string; commands: CommandItem[]; cwdFallback: string }

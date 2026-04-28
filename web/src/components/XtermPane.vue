@@ -9,20 +9,31 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { ReconnectingWS } from '../ws';
 
-const props = defineProps<{ windowId: string }>();
+const props = defineProps<{ session: string; windowId: string }>();
 const root = ref<HTMLDivElement | null>(null);
 let term: Terminal | null = null;
 let fit: FitAddon | null = null;
 let ws: ReconnectingWS | null = null;
 let ro: ResizeObserver | null = null;
 
-function wsUrl(id: string) {
-  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/term/${encodeURIComponent(id)}`;
+function wsUrl(session: string, id: string) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${location.host}/ws/term/${encodeURIComponent(session)}/${encodeURIComponent(id)}`;
 }
 
 function sendResize() {
   if (!term || !ws) return;
   ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+}
+
+function connect() {
+  ws?.close();
+  ws = new ReconnectingWS(wsUrl(props.session, props.windowId), {
+    onMessage: data => {
+      if (data instanceof ArrayBuffer) term?.write(new Uint8Array(data));
+    },
+  });
+  setTimeout(sendResize, 200);
 }
 
 onMounted(() => {
@@ -33,18 +44,12 @@ onMounted(() => {
   term.open(root.value);
   fit.fit();
 
-  ws = new ReconnectingWS(wsUrl(props.windowId), {
-    onMessage: data => {
-      if (data instanceof ArrayBuffer) term?.write(new Uint8Array(data));
-    },
-  });
+  connect();
 
   term.onData(d => ws?.send(new TextEncoder().encode(d)));
 
   ro = new ResizeObserver(() => { fit?.fit(); sendResize(); });
   ro.observe(root.value);
-
-  setTimeout(sendResize, 200);
 });
 
 onUnmounted(() => {
@@ -53,13 +58,7 @@ onUnmounted(() => {
   term?.dispose();
 });
 
-watch(() => props.windowId, () => {
-  ws?.close();
-  ws = new ReconnectingWS(wsUrl(props.windowId), {
-    onMessage: data => { if (data instanceof ArrayBuffer) term?.write(new Uint8Array(data)); },
-  });
-  setTimeout(sendResize, 200);
-});
+watch(() => [props.session, props.windowId], () => connect());
 </script>
 
 <style scoped>

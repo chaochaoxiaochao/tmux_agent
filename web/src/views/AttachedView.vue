@@ -2,11 +2,11 @@
   <div class="attached">
     <header class="bar">
       <button @click="$router.push('/')">← wall</button>
-      <span class="bc">{{ id }}</span>
+      <span class="bc">{{ session }} : {{ id }}</span>
     </header>
     <div class="body">
-      <div class="term-area"><XtermPane :window-id="id" /></div>
-      <StatusPanel :window-id="id" :title="'window ' + id" />
+      <div class="term-area"><XtermPane :session="session" :window-id="id" /></div>
+      <StatusPanel :window-id="id" :title="`${session} : ${id}`" />
     </div>
     <InputBar @send="onSend" />
     <FixedButtonBar @send="onSend" />
@@ -19,10 +19,11 @@ import StatusPanel from '../components/StatusPanel.vue';
 import InputBar from '../components/InputBar.vue';
 import FixedButtonBar from '../components/FixedButtonBar.vue';
 import { api } from '../api';
-const props = defineProps<{ id: string }>();
+
+const props = defineProps<{ session: string; id: string }>();
 
 async function onSend(payload: string) {
-  try { await api.send(props.id, payload); }
+  try { await api.send(props.session, props.id, payload); }
   catch (e: any) { alert(e.message); }
 }
 </script>

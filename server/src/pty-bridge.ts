@@ -5,14 +5,13 @@ import * as pty from 'node-pty';
 export async function registerPtyBridge(app: FastifyInstance) {
   await app.register(websocketPlugin);
 
-  app.get('/ws/term/:id', { websocket: true } as any, (conn, req) => {
-    const id = (req.params as any).id as string;
-    const sessionName = app.cfg.tmux.session;
+  app.get('/ws/term/:session/:id', { websocket: true } as any, (conn, req) => {
+    const { session, id } = req.params as { session: string; id: string };
     const socketName = (app.cfg.tmux as any).socket as string | undefined;
 
     const tmuxArgs = [
       ...(socketName ? ['-L', socketName] : []),
-      'attach-session', '-t', sessionName,
+      'attach-session', '-t', session,
     ];
 
     const ptyProc = pty.spawn('tmux', tmuxArgs, {
@@ -23,9 +22,8 @@ export async function registerPtyBridge(app: FastifyInstance) {
       env: process.env as any,
     });
 
-    // After attach finishes, select target window via tmux prefix command
     setTimeout(() => {
-      ptyProc.write(`\x02:select-window -t ${sessionName}:${id}\n`);
+      ptyProc.write(`\x02:select-window -t ${session}:${id}\n`);
     }, 100);
 
     ptyProc.onData(data => {
@@ -37,7 +35,6 @@ export async function registerPtyBridge(app: FastifyInstance) {
 
     conn.on('message', (raw: any, isBinary: boolean) => {
       if (isBinary) {
-        // raw is Buffer; node-pty.write accepts string. UTF-8 decode is correct for keystrokes.
         ptyProc.write(Buffer.isBuffer(raw) ? raw.toString('utf8') : raw);
       } else {
         try {
