@@ -6,6 +6,6 @@ export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', component: WindowWall },
-    { path: '/w/:id', component: AttachedView, props: true },
+    { path: '/w/:session/:id', component: AttachedView, props: true },
   ],
 });

@@ -21,7 +21,7 @@ export interface ExtendedConfig extends Config {
 export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: cfg.log.level } });
 
-  const tmux = new TmuxControl({ session: cfg.tmux.session, socket: cfg.tmux.socket });
+  const tmux = new TmuxControl({ socket: cfg.tmux.socket });
   app.decorate('tmux', tmux);
   app.decorate('cfg', cfg);
 
