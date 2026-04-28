@@ -26,6 +26,12 @@ function sendResize() {
   ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
 }
 
+function refit() {
+  if (!fit || !term) return;
+  fit.fit();
+  sendResize();
+}
+
 function connect() {
   ws?.close();
   ws = new ReconnectingWS(wsUrl(props.session, props.windowId), {
@@ -33,7 +39,12 @@ function connect() {
       if (data instanceof ArrayBuffer) term?.write(new Uint8Array(data));
     },
   });
-  setTimeout(sendResize, 200);
+  // Layout often isn't fully stable on first paint (font metrics still
+  // loading, dvh adjusting after attach view mounts). Re-fit a few times
+  // so xterm reaches its final cols/rows before tmux locks in pane size.
+  setTimeout(refit, 100);
+  setTimeout(refit, 400);
+  setTimeout(refit, 1000);
 }
 
 onMounted(() => {

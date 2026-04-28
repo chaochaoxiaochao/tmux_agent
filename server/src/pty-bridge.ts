@@ -17,8 +17,12 @@ export async function registerPtyBridge(app: FastifyInstance) {
 
     const ptyProc = pty.spawn('tmux', [...tmuxPrefix, 'attach-session', '-t', session], {
       name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
+      // Start big — most desktop browsers will resize down via the WS resize
+      // message anyway. Starting at 80x24 made tmux 'window-size latest' shrink
+      // the pane during the spawn→resize gap, and Claude Code's HUD lines got
+      // clipped because the pane was briefly that small.
+      cols: 200,
+      rows: 50,
       cwd: process.env.HOME,
       env: process.env as any,
     });
