@@ -17,7 +17,7 @@ npm install
 npm run build
 tmux new -d -s claude    # 你的目标 session
 npm start
-# → http://127.0.0.1:7681
+# → 监听 0.0.0.0:7681；本机访问 http://127.0.0.1:7681；同网段/VPN 设备改用主机 IP
 ```
 
 ## 配置文件
@@ -26,7 +26,7 @@ npm start
 
 ```yaml
 server:
-  host: 127.0.0.1   # 改 VPN 网卡 IP 暴露给手机
+  host: 0.0.0.0     # 默认监听全部网卡；想锁本机改 127.0.0.1
   port: 7681
 
 tmux:
@@ -57,11 +57,11 @@ journalctl --user -u tmux-agent -f
 
 ## 安全警告
 
-应用层**没有认证**。绝对不要把 `server.host` 改成 `0.0.0.0` 暴露在公网。推荐：
+应用层**没有认证**。默认监听 `0.0.0.0` 意味着同网段/VPN 上的任何设备都能访问。要保证安全，**访问链路必须由 VPN 或防火墙兜底**：
 
-- 默认 `127.0.0.1`，本机访问
-- VPN（Tailscale / WireGuard / 公司 VPN）下绑 VPN 网卡 IP
-- 不要直接把端口转发到公网
+- 推荐：跑在 VPN（Tailscale / WireGuard / 公司 VPN）网络下，户外设备通过 VPN 访问主机 IP
+- 不要把这个端口直接转发到公网（NAT/端口映射）—— 任何能连到的人都能完整操作你的 tmux
+- 想严格点：把 `server.host` 改成 `127.0.0.1`（仅本机），或改成具体的 VPN 网卡 IP（仅 VPN 内）
 
 ## 测试
 

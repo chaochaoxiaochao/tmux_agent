@@ -13,7 +13,7 @@ export interface Command { name: string; hint: string; payload: string }
 export interface StatusRule { match: string; status: 'ok' | 'warn' | 'err' }
 
 export const DEFAULT_CONFIG: Config = {
-  server: { host: '127.0.0.1', port: 7681 },
+  server: { host: '0.0.0.0', port: 7681 },
   tmux: { session: 'claude', cwdFallback: '~' },
   ui: { accent: 'green', density: 'comfortable' },
   buttons: [

@@ -3,7 +3,7 @@ import { DEFAULT_CONFIG, mergeConfig, validateConfig } from '../../src/config.sc
 
 describe('config defaults', () => {
   it('DEFAULT_CONFIG matches spec', () => {
-    expect(DEFAULT_CONFIG.server.host).toBe('127.0.0.1');
+    expect(DEFAULT_CONFIG.server.host).toBe('0.0.0.0');
     expect(DEFAULT_CONFIG.server.port).toBe(7681);
     expect(DEFAULT_CONFIG.tmux.session).toBe('claude');
     expect(DEFAULT_CONFIG.ui.accent).toBe('green');
@@ -16,7 +16,7 @@ describe('config defaults', () => {
 describe('mergeConfig', () => {
   it('overlays partial user config on defaults', () => {
     const merged = mergeConfig({ server: { port: 9000 } } as any);
-    expect(merged.server.host).toBe('127.0.0.1');
+    expect(merged.server.host).toBe('0.0.0.0');
     expect(merged.server.port).toBe(9000);
     expect(merged.tmux.session).toBe('claude');
   });
@@ -76,7 +76,7 @@ describe('loadConfig', () => {
   it('writes defaults when file missing', () => {
     const p = tmpFile('config.yaml');
     const cfg = loadConfig(p);
-    expect(cfg.server.host).toBe('127.0.0.1');
+    expect(cfg.server.host).toBe('0.0.0.0');
     expect(fs.existsSync(p)).toBe(true);
   });
 

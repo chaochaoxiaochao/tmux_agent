@@ -9,7 +9,7 @@ describe('main config loading', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tmux-agent-main-'));
     const p = path.join(dir, 'config.yaml');
     const cfg = loadConfigForMain(p);
-    expect(cfg.server.host).toBe('127.0.0.1');
+    expect(cfg.server.host).toBe('0.0.0.0');
     expect(fs.existsSync(p)).toBe(true);
   });
 
