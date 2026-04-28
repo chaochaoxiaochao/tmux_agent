@@ -68,5 +68,5 @@ watch(() => [props.session, props.windowId], () => connect());
 </script>
 
 <style scoped>
-.xterm-host { width: 100%; height: 100%; }
+.xterm-host { width: 100%; height: 100%; padding: 4px 6px; box-sizing: border-box; background: #000; }
 </style>

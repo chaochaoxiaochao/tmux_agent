@@ -41,5 +41,5 @@ async function onSend(payload: string) {
 .spacer { flex: 1; }
 .kbd-btn { color: var(--accent); border-color: var(--accent); }
 .body { display: flex; flex: 1; min-height: 0; }
-.term-area { flex: 1; min-height: 0; padding: 8px; }
+.term-area { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 </style>
