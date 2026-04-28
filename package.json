@@ -1,0 +1,13 @@
+{
+  "name": "tmux-agent",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "build": "npm run -w web build && npm run -w server build",
+    "start": "node server/dist/server.js",
+    "test": "npm run -w server test",
+    "test:integration": "npm run -w server test:integration"
+  },
+  "engines": { "node": ">=18" }
+}
