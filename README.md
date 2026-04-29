@@ -6,7 +6,7 @@
 
 **Wall + Attached view**：
 
-https://github.com/chaochaoxiaochao/tmux_agent/raw/master/docs/demo.mp4
+https://github.com/user-attachments/assets/7fde04cc-bc3e-4c04-8208-03ca8ca537e0
 
 **企微通知（任务完成 / 等输入）带 deep link，点击直达对应 Web 终端**：
 
