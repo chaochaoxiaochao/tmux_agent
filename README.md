@@ -4,13 +4,13 @@
 
 ## 演示
 
-**Wall + Attached view**：
-
-https://github.com/user-attachments/assets/7fde04cc-bc3e-4c04-8208-03ca8ca537e0
-
 **企微通知（任务完成 / 等输入）带 deep link，点击直达对应 Web 终端**：
 
 ![企微通知示例](docs/wechat-notification.png)
+
+**Wall + Attached view**：
+
+https://github.com/user-attachments/assets/7fde04cc-bc3e-4c04-8208-03ca8ca537e0
 
 **Wall 视图**列出所有 tmux session（每个 session 一组 tile），tile 颜色：
 
