@@ -69,6 +69,43 @@ export async function registerWindowsRoutes(app: FastifyInstance) {
     },
   );
 
+  // List panes in a window. Used by the AttachedView pane-tab strip and
+  // for "auto-zoom on enter" decision.
+  app.get<{ Params: { session: string; id: string } }>(
+    '/api/sessions/:session/windows/:id/panes',
+    async (req, reply) => {
+      const { session, id } = req.params;
+      const exists = (await app.tmux.listWindows(session)).some(w => w.id === id);
+      if (!exists) {
+        reply.status(404).send({ error: 'window_not_found', message: `${session}:${id}` });
+        return;
+      }
+      return app.tmux.listPanes(session, id);
+    },
+  );
+
+  // Select a pane (make it active).
+  app.post<{ Params: { session: string; id: string; pane: string } }>(
+    '/api/sessions/:session/windows/:id/panes/:pane/select',
+    async (req, reply) => {
+      const { session, id, pane } = req.params;
+      try { await app.tmux.selectPane(session, id, pane); }
+      catch (e: any) { reply.status(502).send({ error: 'select_failed', message: e.message }); return; }
+      reply.status(204).send();
+    },
+  );
+
+  // Toggle zoom on a pane (equivalent to tmux prefix+z).
+  app.post<{ Params: { session: string; id: string; pane: string } }>(
+    '/api/sessions/:session/windows/:id/panes/:pane/zoom',
+    async (req, reply) => {
+      const { session, id, pane } = req.params;
+      try { await app.tmux.toggleZoom(session, id, pane); }
+      catch (e: any) { reply.status(502).send({ error: 'zoom_failed', message: e.message }); return; }
+      reply.status(204).send();
+    },
+  );
+
   // Enter tmux copy-mode for the given window. Lets the client read the
   // window's scrollback buffer without touching the prefix key.
   app.post<{ Params: { session: string; id: string } }>(

@@ -35,6 +35,31 @@ export function copyMode(session: string, windowId: string): string[] {
   return ['copy-mode', '-t', `${session}:${windowId}`];
 }
 
+const PANE_FMT = '#{pane_id}|#{pane_index}|#{pane_active}|#{pane_width}x#{pane_height}|#{pane_current_command}';
+
+export function listPanes(session: string, windowId: string): string[] {
+  return ['list-panes', '-t', `${session}:${windowId}`, '-F', PANE_FMT];
+}
+
+export function parsePaneLine(line: string) {
+  const [id, index, active, size, cmd] = line.split('|');
+  return {
+    id, cmd: cmd ?? '',
+    index: Number(index),
+    active: active === '1',
+    size: size ?? '',
+  };
+}
+
+export function selectPane(session: string, windowId: string, paneId: string): string[] {
+  return ['select-pane', '-t', `${session}:${windowId}.${paneId}`];
+}
+
+// Toggle zoom on a pane. tmux's resize-pane -Z is a toggle.
+export function toggleZoom(session: string, windowId: string, paneId: string): string[] {
+  return ['resize-pane', '-Z', '-t', `${session}:${windowId}.${paneId}`];
+}
+
 export function hasSession(session: string): string[] {
   return ['has-session', '-t', session];
 }

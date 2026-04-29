@@ -26,7 +26,7 @@
         >
           <header>
             <span class="tile-dot" :class="{ pulse: !!w.attention }"></span>
-            <span class="tile-name">{{ w.index }}: {{ w.name }}</span>
+            <span class="tile-name">{{ w.index }}: {{ w.name }}<span v-if="w.panes > 1" class="panes-badge">{{ w.panes }}p</span></span>
             <span class="status-badge attn" v-if="w.attention === 'input-needed'">INPUT</span>
             <span class="status-badge done" v-else-if="w.attention === 'done'">DONE</span>
             <span class="age">{{ humanAge(w.lastOutputAgeMs) }}</span>
@@ -214,6 +214,12 @@ function humanAge(ms: number): string {
 .tile-name {
   flex: 1; font-weight: 600; font-family: ui-monospace, monospace; font-size: 12px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.panes-badge {
+  margin-left: 6px; padding: 0 5px; border-radius: 4px;
+  font-weight: 400; font-size: 10px;
+  background: var(--bg); color: var(--ink-faint);
+  border: 1px solid var(--ink-faint);
 }
 .status-badge {
   flex: 0 0 auto;

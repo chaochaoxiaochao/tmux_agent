@@ -6,6 +6,7 @@
       <span class="spacer"></span>
       <button class="kbd-btn" @click="dialogOpen = true">⌨ input</button>
     </header>
+    <PaneStrip :session="session" :window-id="id" />
     <div class="body">
       <div class="term-area"><XtermPane :session="session" :window-id="id" /></div>
       <StatusPanel :window-id="id" :title="`${session} : ${id}`" />
@@ -23,6 +24,7 @@ import StatusPanel from '../components/StatusPanel.vue';
 import ScrollControls from '../components/ScrollControls.vue';
 import FixedButtonBar from '../components/FixedButtonBar.vue';
 import InputDialog from '../components/InputDialog.vue';
+import PaneStrip from '../components/PaneStrip.vue';
 import { api } from '../api';
 
 const props = defineProps<{ session: string; id: string }>();
@@ -33,13 +35,31 @@ async function onSend(payload: string) {
   catch (e: any) { alert(e.message); }
 }
 
-// Visiting a window acks any pending attention notification for it
-// (Claude Code Notification/Stop hooks). The wall stops pulsing it.
-function ackAttention() {
+// Visiting a window:
+// 1. clear any pending attention notification (wall stops pulsing)
+// 2. if window has 2+ panes, auto-zoom the active one for a focused mobile view
+async function onEnter() {
   api.clearAttention(props.session, props.id).catch(() => { /* best effort */ });
+  try {
+    const panes = await api.panes(props.session, props.id);
+    if (panes.length > 1) {
+      const active = panes.find(p => p.active) ?? panes[0];
+      // resize-pane -Z is a toggle, but tmux keeps the zoom state per-window;
+      // calling it twice in a row would un-zoom. Instead, we only zoom when
+      // the window isn't already in a zoomed state. There's no direct flag,
+      // so heuristic: if exactly one pane is reported with non-trivial size
+      // and others are 0x0, it's likely already zoomed. Skipping to avoid
+      // double-toggle. Otherwise zoom.
+      const looksZoomed = panes.filter(p => p.size === '0x0').length === panes.length - 1;
+      if (!looksZoomed) {
+        await api.zoomPane(props.session, props.id, active.id);
+      }
+    }
+  } catch { /* best effort, ignore */ }
 }
-onMounted(ackAttention);
-watch(() => [props.session, props.id], ackAttention);
+
+onMounted(onEnter);
+watch(() => [props.session, props.id], onEnter);
 </script>
 
 <style scoped>

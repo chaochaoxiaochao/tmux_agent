@@ -7,6 +7,7 @@ const execFileP = promisify(execFile);
 
 export interface WindowMeta { id: string; index: number; name: string; active: boolean; panes: number }
 export interface SessionMeta { name: string; attached: boolean; windowCount: number }
+export interface PaneMeta { id: string; index: number; active: boolean; size: string; cmd: string }
 
 export interface TmuxControlOpts {
   socket?: string;
@@ -69,6 +70,21 @@ export class TmuxControl {
 
   async copyMode(session: string, windowId: string): Promise<void> {
     await this.run(cmd.copyMode(session, windowId));
+  }
+
+  async listPanes(session: string, windowId: string): Promise<PaneMeta[]> {
+    try {
+      const { stdout } = await this.run(cmd.listPanes(session, windowId));
+      return stdout.trim().split('\n').filter(Boolean).map(cmd.parsePaneLine);
+    } catch { return []; }
+  }
+
+  async selectPane(session: string, windowId: string, paneId: string): Promise<void> {
+    await this.run(cmd.selectPane(session, windowId, paneId));
+  }
+
+  async toggleZoom(session: string, windowId: string, paneId: string): Promise<void> {
+    await this.run(cmd.toggleZoom(session, windowId, paneId));
   }
 
   async sendKey(session: string, windowId: string, key: string): Promise<void> {

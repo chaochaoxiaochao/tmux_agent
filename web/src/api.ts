@@ -33,6 +33,13 @@ export const api = {
     http<void>('POST', `${wbase(session)}/${enc(id)}/send`, { text }),
   copyMode: (session: string, id: string) =>
     http<void>('POST', `${wbase(session)}/${enc(id)}/copy-mode`),
+  panes: (session: string, id: string) =>
+    http<{ id: string; index: number; active: boolean; size: string; cmd: string }[]>(
+      'GET', `${wbase(session)}/${enc(id)}/panes`),
+  selectPane: (session: string, id: string, pane: string) =>
+    http<void>('POST', `${wbase(session)}/${enc(id)}/panes/${enc(pane)}/select`),
+  zoomPane: (session: string, id: string, pane: string) =>
+    http<void>('POST', `${wbase(session)}/${enc(id)}/panes/${enc(pane)}/zoom`),
   clearAttention: (session: string, windowId: string) =>
     http<void>('POST', '/api/notify/clear', { session, windowId }),
   sendKey: (session: string, id: string, key: string) =>
