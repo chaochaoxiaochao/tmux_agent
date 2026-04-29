@@ -3,8 +3,6 @@
     <header class="bar">
       <button @click="$router.push('/')">← wall</button>
       <span class="bc">{{ session }} : {{ id }}</span>
-      <span class="spacer"></span>
-      <button class="kbd-btn" @click="dialogOpen = true">⌨ input</button>
     </header>
     <PaneStrip :session="session" :window-id="id" />
     <div class="body">
@@ -53,8 +51,6 @@ watch(() => [props.session, props.id], onEnter);
 .attached { display: flex; flex-direction: column; height: 100%; }
 .bar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid #222; }
 .bc { color: var(--ink-dim); font: 12px ui-monospace, monospace; }
-.spacer { flex: 1; }
-.kbd-btn { color: var(--accent); border-color: var(--accent); }
 .body { display: flex; flex: 1; min-height: 0; }
 .term-area { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 </style>
