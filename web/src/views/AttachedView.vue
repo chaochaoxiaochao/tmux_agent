@@ -8,7 +8,7 @@
     </header>
     <PaneStrip :session="session" :window-id="id" />
     <div class="body">
-      <div class="term-area"><XtermPane :session="session" :window-id="id" /></div>
+      <div class="term-area"><XtermPane :session="session" :window-id="id" @tap="dialogOpen = true" /></div>
       <StatusPanel :window-id="id" :title="`${session} : ${id}`" />
     </div>
     <ScrollControls :session="session" :window-id="id" />

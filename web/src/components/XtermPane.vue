@@ -1,5 +1,12 @@
 <template>
-  <div ref="root" class="xterm-host"></div>
+  <div class="xterm-wrap">
+    <div ref="root" class="xterm-host"></div>
+    <!-- Mobile-only click catcher. Sits over the terminal to intercept taps so
+         xterm's hidden textarea doesn't grab focus (which would pop the OS
+         keyboard with no way to dismiss it). Click bubbles up as @tap so the
+         parent can open InputDialog. Hidden on desktop via @media. -->
+    <div class="tap-overlay" @click="$emit('tap')"></div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -10,6 +17,8 @@ import '@xterm/xterm/css/xterm.css';
 import { ReconnectingWS } from '../ws';
 
 const props = defineProps<{ session: string; windowId: string }>();
+defineEmits<{ (e: 'tap'): void }>();
+
 const root = ref<HTMLDivElement | null>(null);
 let term: Terminal | null = null;
 let fit: FitAddon | null = null;
@@ -68,8 +77,6 @@ onMounted(() => {
 
   ro = new ResizeObserver(() => { fit?.fit(); sendResize(); });
   ro.observe(root.value);
-  // Some browsers don't fire ResizeObserver on the host when only ancestor
-  // sizes change (e.g. visualViewport shrinks for keyboard). Hook those too.
   window.addEventListener('resize', onWinResize);
   window.addEventListener('orientationchange', onWinResize);
   (window as any).visualViewport?.addEventListener?.('resize', onWinResize);
@@ -88,6 +95,10 @@ watch(() => [props.session, props.windowId], () => connect());
 </script>
 
 <style scoped>
+.xterm-wrap {
+  position: relative;
+  width: 100%; height: 100%;
+}
 .xterm-host {
   width: 100%; height: 100%;
   padding: 4px 6px; box-sizing: border-box;
@@ -95,12 +106,19 @@ watch(() => [props.session, props.windowId], () => connect());
   overflow: hidden;          /* never show internal scrollbars; FitAddon owns sizing */
   contain: strict;           /* don't let xterm's measure pass push parent layout */
 }
+/* Click catcher hidden on desktop — desktop users want native xterm
+ * interaction (focus, copy/paste, etc.). */
+.tap-overlay { display: none; }
 
-/* On mobile (narrow screens), make the terminal area non-interactive so
- * tapping it doesn't focus xterm's hidden textarea and pop the keyboard.
- * User sends input via the top-bar '⌨ input' dialog instead.
- * Desktop keeps full interactivity. */
+/* Mobile (<=600px): the overlay covers the terminal and absorbs taps,
+ * preventing xterm's helper-textarea from getting focus and popping the
+ * OS keyboard. Tap fires @tap so the parent opens InputDialog. */
 @media (max-width: 600px) {
-  .xterm-host { pointer-events: none; user-select: none; -webkit-user-select: none; }
+  .tap-overlay {
+    display: block;
+    position: absolute; inset: 0;
+    background: transparent;
+    cursor: pointer;
+  }
 }
 </style>
