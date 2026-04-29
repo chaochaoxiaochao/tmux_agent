@@ -159,8 +159,7 @@ function humanAge(ms: number): string {
 .count { color: var(--ink-faint); font-size: 11px; flex: 1; }
 .add { font-size: 11px; padding: 3px 8px; }
 
-.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+.grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
 
 .tile {
   background: var(--bg-alt); border: 1px solid var(--ink-faint); border-radius: 6px;
@@ -232,15 +231,9 @@ function humanAge(ms: number): string {
   white-space: pre-wrap; word-break: break-all;
   max-height: 60px; overflow: hidden; margin: 0;
 }
-.preview-full {
-  color: var(--ink-dim); font: 11px ui-monospace, monospace; white-space: pre-wrap;
-  max-height: 140px; overflow: hidden; margin: 8px 0 0; word-break: break-all;
-}
-
-/* Mobile: only summary, hide the full preview block */
-@media (max-width: 600px) {
-  .preview-full { display: none; }
-}
+/* preview-full historically showed last 8 lines on desktop. With single-column
+ * layout the summary (last 3 lines) is enough — full block hidden everywhere. */
+.preview-full { display: none; }
 
 .session-empty { color: var(--ink-faint); padding: 12px; }
 .empty { color: var(--ink-faint); padding: 24px; text-align: center; }
