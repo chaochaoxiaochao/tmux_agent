@@ -21,6 +21,7 @@ export const DEFAULT_CONFIG: Config = {
     { id: 'btn-no', label: 'No', payload: 'n\n' },
     { id: 'btn-yes-all', label: 'Yes·all', payload: '2\n' },
     { id: 'btn-esc', label: 'Esc', payload: '\u001b' },
+    { id: 'btn-ctrl-c', label: 'Ctrl+C', payload: '\u0003' },
   ],
   commands: [
     { name: 'commit', hint: 'git commit -m', payload: 'git commit -m "' },
