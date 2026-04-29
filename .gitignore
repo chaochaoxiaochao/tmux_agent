@@ -9,6 +9,9 @@ node_modules/
 extracted/
 *.png
 
-# vue-tsc emits stub .vue.js next to .vue files; we don't track these
+# vue-tsc / tsc emit .js next to .ts and .vue.js next to .vue during type
+# checks (incremental build artifacts). The runtime bundle comes from
+# vite build under web/dist/, not these.
 web/src/**/*.vue.js
+web/src/**/*.js
 web/tsconfig.tsbuildinfo
