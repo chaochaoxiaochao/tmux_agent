@@ -8,6 +8,10 @@ node_modules/
 *.zip
 extracted/
 *.png
+*.mp4
+# but track the README assets under docs/
+!docs/*.png
+!docs/*.mp4
 
 # vue-tsc / tsc emit .js next to .ts and .vue.js next to .vue during type
 # checks (incremental build artifacts). The runtime bundle comes from

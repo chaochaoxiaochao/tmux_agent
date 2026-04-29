@@ -2,6 +2,16 @@
 
 浏览器里使用 tmux：户外用手机/笔记本通过 VPN 访问家里主机的 tmux session。每个 tile 是一个 tmux window，点开就是一个全屏 xterm，配套固定按钮 / 文本输入。
 
+## 演示
+
+**Wall + Attached view**：
+
+https://github.com/chaochaoxiaochao/tmux_agent/raw/master/docs/demo.mp4
+
+**企微通知（任务完成 / 等输入）带 deep link，点击直达对应 Web 终端**：
+
+![企微通知示例](docs/wechat-notification.png)
+
 **Wall 视图**列出所有 tmux session（每个 session 一组 tile），tile 颜色：
 
 - 🟢 **绿** — 该 pane 最近 5 秒有输出
