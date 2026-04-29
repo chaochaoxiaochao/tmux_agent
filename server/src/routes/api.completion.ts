@@ -33,5 +33,6 @@ export function registerCompletionRoutes(app: FastifyInstance) {
     density: app.cfg.ui.density,
     commands: app.cfg.commands,
     cwdFallback: app.cfg.tmux.cwdFallback,
+    publicUrl: app.cfg.server.publicUrl ?? null,
   }));
 }
