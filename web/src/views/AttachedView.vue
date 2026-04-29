@@ -37,25 +37,12 @@ async function onSend(payload: string) {
 
 // Visiting a window:
 // 1. clear any pending attention notification (wall stops pulsing)
-// 2. if window has 2+ panes, auto-zoom the active one for a focused mobile view
+// 2. ensure the window is zoomed on its active pane so mobile sees one pane
+//    full-screen instead of a cramped multi-pane layout. Backend checks
+//    window_zoomed_flag and only toggles when needed — idempotent.
 async function onEnter() {
   api.clearAttention(props.session, props.id).catch(() => { /* best effort */ });
-  try {
-    const panes = await api.panes(props.session, props.id);
-    if (panes.length > 1) {
-      const active = panes.find(p => p.active) ?? panes[0];
-      // resize-pane -Z is a toggle, but tmux keeps the zoom state per-window;
-      // calling it twice in a row would un-zoom. Instead, we only zoom when
-      // the window isn't already in a zoomed state. There's no direct flag,
-      // so heuristic: if exactly one pane is reported with non-trivial size
-      // and others are 0x0, it's likely already zoomed. Skipping to avoid
-      // double-toggle. Otherwise zoom.
-      const looksZoomed = panes.filter(p => p.size === '0x0').length === panes.length - 1;
-      if (!looksZoomed) {
-        await api.zoomPane(props.session, props.id, active.id);
-      }
-    }
-  } catch { /* best effort, ignore */ }
+  api.ensureZoomed(props.session, props.id).catch(() => { /* best effort */ });
 }
 
 onMounted(onEnter);

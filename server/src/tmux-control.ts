@@ -87,6 +87,25 @@ export class TmuxControl {
     await this.run(cmd.toggleZoom(session, windowId, paneId));
   }
 
+  async isWindowZoomed(session: string, windowId: string): Promise<boolean> {
+    try {
+      const { stdout } = await this.run(cmd.windowZoomedFlag(session, windowId));
+      return stdout.trim() === '1';
+    } catch { return false; }
+  }
+
+  // Idempotent "make sure window is zoomed on its active pane".
+  // - If already zoomed, no-op.
+  // - Otherwise toggle zoom on the active pane.
+  // Caller doesn't need to know pane id.
+  async ensureZoomedOnActive(session: string, windowId: string): Promise<void> {
+    if (await this.isWindowZoomed(session, windowId)) return;
+    const panes = await this.listPanes(session, windowId);
+    if (panes.length <= 1) return;     // single pane = no-op
+    const active = panes.find(p => p.active) ?? panes[0];
+    await this.run(cmd.toggleZoom(session, windowId, active.id));
+  }
+
   async sendKey(session: string, windowId: string, key: string): Promise<void> {
     await this.run(['send-keys', '-t', `${session}:${windowId}`, key]);
   }

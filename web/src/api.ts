@@ -40,6 +40,8 @@ export const api = {
     http<void>('POST', `${wbase(session)}/${enc(id)}/panes/${enc(pane)}/select`),
   zoomPane: (session: string, id: string, pane: string) =>
     http<void>('POST', `${wbase(session)}/${enc(id)}/panes/${enc(pane)}/zoom`),
+  ensureZoomed: (session: string, id: string) =>
+    http<void>('POST', `${wbase(session)}/${enc(id)}/ensure-zoom`),
   clearAttention: (session: string, windowId: string) =>
     http<void>('POST', '/api/notify/clear', { session, windowId }),
   sendKey: (session: string, id: string, key: string) =>

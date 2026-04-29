@@ -60,6 +60,12 @@ export function toggleZoom(session: string, windowId: string, paneId: string): s
   return ['resize-pane', '-Z', '-t', `${session}:${windowId}.${paneId}`];
 }
 
+// Read whether the window is currently in a zoomed state.
+// tmux's display-message -p '#{window_zoomed_flag}' returns "1" or "0".
+export function windowZoomedFlag(session: string, windowId: string): string[] {
+  return ['display-message', '-p', '-t', `${session}:${windowId}`, '#{window_zoomed_flag}'];
+}
+
 export function hasSession(session: string): string[] {
   return ['has-session', '-t', session];
 }

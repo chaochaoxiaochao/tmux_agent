@@ -106,6 +106,19 @@ export async function registerWindowsRoutes(app: FastifyInstance) {
     },
   );
 
+  // Idempotent: make sure the window is zoomed on its active pane.
+  // Used when the AttachedView mounts so mobile users always see one pane
+  // full-screen instead of a cramped multi-pane layout.
+  app.post<{ Params: { session: string; id: string } }>(
+    '/api/sessions/:session/windows/:id/ensure-zoom',
+    async (req, reply) => {
+      const { session, id } = req.params;
+      try { await app.tmux.ensureZoomedOnActive(session, id); }
+      catch (e: any) { reply.status(502).send({ error: 'zoom_failed', message: e.message }); return; }
+      reply.status(204).send();
+    },
+  );
+
   // Enter tmux copy-mode for the given window. Lets the client read the
   // window's scrollback buffer without touching the prefix key.
   app.post<{ Params: { session: string; id: string } }>(
