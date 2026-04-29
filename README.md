@@ -132,11 +132,60 @@ curl -sX POST "$TMUX_AGENT_URL/api/notify" \
 
 ## systemd 一键启动
 
+脚本装的是 **user-level systemd unit**（跑在你账号下，不需要 sudo）。原因：tmux-agent 必须以你的身份跑才能访问你的 tmux server（socket 在 `/tmp/tmux-<uid>/`）、读 `~/.config/tmux-agent/config.yaml`、用你的 shell 生成 PTY。
+
+### 安装
+
 ```bash
 ./scripts/install-systemd.sh
-systemctl --user status tmux-agent
-journalctl --user -u tmux-agent -f
 ```
+
+脚本会：
+1. 检查 `tmux` 和 `node` 在 PATH
+2. 写 `~/.config/systemd/user/tmux-agent.service`
+3. `npm install && npm run build`
+4. `systemctl --user daemon-reload && enable --now tmux-agent`
+
+装完即在跑。装之前如果手动起过 `node server/dist/main.js`，先 `pkill` 掉避免端口冲突。
+
+### 常用命令
+
+```bash
+systemctl --user status tmux-agent       # 看状态（active/failed）
+systemctl --user restart tmux-agent      # 改了代码 npm run build 后重启
+systemctl --user stop tmux-agent         # 停
+systemctl --user start tmux-agent        # 起
+systemctl --user disable tmux-agent      # 取消开机自启（不卸载文件）
+systemctl --user disable --now tmux-agent  # 同时停掉
+journalctl --user -u tmux-agent -f       # 实时跟日志
+journalctl --user -u tmux-agent -n 200   # 看最近 200 行
+journalctl --user -u tmux-agent --since '10 min ago'
+```
+
+### 让服务在你登出后也活着（lingering）
+
+`--user` 实例默认**登出即停**。要"机器开着就一直跑"（夜里手机随时连）：
+
+```bash
+loginctl enable-linger $USER             # 一次性，永久生效
+loginctl show-user $USER | grep Linger   # 验证：Linger=yes
+```
+
+关掉：`loginctl disable-linger $USER`。
+
+### 卸载
+
+```bash
+systemctl --user disable --now tmux-agent
+rm ~/.config/systemd/user/tmux-agent.service
+systemctl --user daemon-reload
+```
+
+### Troubleshooting
+
+- **`Failed to connect to user scope bus via local transport`** —— 你不是通过 ssh 直接登录而是用 sudo 切过来的。`sudo` 的 user systemd 没启。先 `loginctl enable-linger $USER` + 直接登录该用户。
+- **`active (running)` 但 wall 全空** —— 服务起来了但没 tmux session。`tmux ls` 看一眼，新建一个：`tmux new -d -s claude`。
+- **改了代码但没生效** —— 别忘 `npm run build`，再 `systemctl --user restart tmux-agent`。frontend 改了不重启服务也行（fastify-static 直接读 `web/dist/` 文件），但浏览器要强刷。
 
 ## 安全警告
 
