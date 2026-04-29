@@ -58,11 +58,33 @@ statusRules: []
 
 按钮 `payload` 转义：`\n` → Enter，`\t` → Tab，`` → ESC。
 
-## Claude Code Hook 集成（让 wall 闪烁）
+## Claude Code Hook 集成（让 wall 闪烁 + 企微推送 + deep link）
 
-Claude Code 弹"等输入"或"任务完成"时，让对应 wall tile 黄/蓝闪烁。原理：Claude Code 的 `Notification` / `Stop` hook 调用 tmux-agent 的 `POST /api/notify` 接口，告诉它哪个 tmux pane 该被关注。进入 attached view 自动清。
+Claude Code 弹"等输入"或"任务完成"时：
+1. tmux-agent 的对应 wall tile 黄/蓝闪烁（进 attached view 自动清）
+2. 推一条企微消息，带「打开 Web 终端」可点链接，跳转到对应 attached view
 
-### 1. 在 Claude Code 注册 hook
+原理：Claude Code 的 `Notification` / `Stop` hook 调用一个 bash 脚本，脚本同时干两件事——POST `/api/notify` 给 tmux-agent，POST 企微 webhook。
+
+### 1. config.yaml 加 publicUrl
+
+`~/.config/tmux-agent/config.yaml` 顶部加一行：
+
+```yaml
+server:
+  host: 0.0.0.0
+  port: 7681
+  publicUrl: http://<your-host-ip>:7681   # 外部可访问的链接（hook 拼进通知消息让点击跳转）
+```
+
+替换 `<your-host-ip>` 为：
+- 走 VPN 的话 → VPN 网卡 IP（`ip -4 addr` 查）
+- 内网 → 内网 IP
+- 不配置就回退到 `127.0.0.1`，企微链接会点不开
+
+改完 `systemctl --user restart tmux-agent`。
+
+### 2. 注册 hook
 
 `~/.claude/settings.json`：
 
@@ -71,64 +93,102 @@ Claude Code 弹"等输入"或"任务完成"时，让对应 wall tile 黄/蓝闪�
   "hooks": {
     "Notification": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "bash ~/.claude/hooks/tmux_agent_notify.sh" }
+        { "type": "command", "command": "bash ~/.claude/hooks/notify.sh" }
       ]}
     ],
     "Stop": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "bash ~/.claude/hooks/tmux_agent_notify.sh" }
+        { "type": "command", "command": "bash ~/.claude/hooks/notify.sh" }
       ]}
     ]
   }
 }
 ```
 
-### 2. Hook 脚本
+### 3. Hook 脚本
 
-`~/.claude/hooks/tmux_agent_notify.sh`：
+`~/.claude/hooks/notify.sh`（`chmod +x`）：
 
 ```bash
 #!/bin/bash
-TMUX_AGENT_URL="${TMUX_AGENT_URL:-http://127.0.0.1:7681}"
-json_input=$(cat)
+# 通知脚本：tmux-agent wall 闪烁 + 企微 markdown 消息（带 deep link）
 
+# !!! 改成你自己的企微机器人 webhook URL !!!
+# 群机器人 → 添加 → 选择「群机器人」→ 复制 webhook URL
+# 留空字符串则跳过企微推送，只闪烁 wall tile。
+WECOM_WEBHOOK=""
+
+TMUX_AGENT_URL="${TMUX_AGENT_URL:-http://127.0.0.1:7681}"
+
+json_input=$(cat)
 hook_event_name=$(echo "$json_input" | jq -r '.hook_event_name')
 notification_type=$(echo "$json_input" | jq -r '.notification_type // ""')
+message=$(echo "$json_input" | jq -r '.message')
+session_id=$(echo "$json_input" | jq -r '.session_id')
+cwd=$(echo "$json_input" | jq -r '.cwd')
 
 # Claude Code 用户没回应时会发 notification_type=idle_prompt 的 Notification
-# (message="Claude is waiting for your input")。这不是真的"该回了"，
-# 是定时催促，吞掉。真正的等输入（permission 请求）没有这个字段。
+# (message="Claude is waiting for your input")。这不是真的等输入（permission
+# 请求那种没有这个字段），是定时催促，吞掉避免误报。
 if [ "$hook_event_name" = "Notification" ] && [ "$notification_type" = "idle_prompt" ]; then
   exit 0
 fi
 
-# 把当前 tmux pane 翻译成 session/window，调 tmux-agent。
-[ -z "$TMUX_PANE" ] && exit 0
-target=$(tmux display-message -p -t "$TMUX_PANE" '#{session_name},#{window_id}' 2>/dev/null)
-[ -z "$target" ] && exit 0
-s="${target%%,*}"; w="${target##*,}"
-
-if [ "$hook_event_name" = "Stop" ]; then
-  kind="done"             # 任务完成 → 蓝色脉动
-else
-  kind="input-needed"     # 等输入 → 黄色脉动
+# 解析当前 tmux pane → session/window-id（戳 tmux-agent + 拼 deep link）
+TMUX_S=""; TMUX_W=""
+if [ -n "$TMUX_PANE" ]; then
+  target=$(tmux display-message -p -t "$TMUX_PANE" '#{session_name},#{window_id}' 2>/dev/null)
+  if [ -n "$target" ]; then
+    TMUX_S="${target%%,*}"
+    TMUX_W="${target##*,}"
+  fi
 fi
 
-curl -sX POST "$TMUX_AGENT_URL/api/notify" \
-  -H 'content-type: application/json' \
-  -d "{\"session\":\"$s\",\"windowId\":\"$w\",\"kind\":\"$kind\"}" \
-  >/dev/null 2>&1 &
+# 戳 tmux-agent 让对应 window tile 闪烁
+if [ -n "$TMUX_S" ] && [ -n "$TMUX_W" ]; then
+  kind="input-needed"
+  [ "$hook_event_name" = "Stop" ] && kind="done"
+  curl -sX POST "$TMUX_AGENT_URL/api/notify" \
+    -H 'content-type: application/json' \
+    -d "{\"session\":\"$TMUX_S\",\"windowId\":\"$TMUX_W\",\"kind\":\"$kind\"}" \
+    > /dev/null 2>&1 &
+fi
+
+# 推企微（webhook 没配就跳过）
+[ -z "$WECOM_WEBHOOK" ] && exit 0
+
+# 拼 deep link
+PUBLIC_URL=$(curl -s "$TMUX_AGENT_URL/api/config" 2>/dev/null | jq -r '.publicUrl // empty')
+[ -z "$PUBLIC_URL" ] && PUBLIC_URL="$TMUX_AGENT_URL"
+url_encode() { jq -rRn --arg s "$1" '$s|@uri'; }
+DEEP_LINK=""
+if [ -n "$TMUX_S" ] && [ -n "$TMUX_W" ]; then
+  DEEP_LINK="$PUBLIC_URL/#/w/$(url_encode "$TMUX_S")/$(url_encode "$TMUX_W")"
+fi
+
+if [ "$hook_event_name" = "Stop" ]; then
+  HEAD="✅ Claude Code 任务完成"
+  BODY="主人我完成任务了\n>Cwd: \`$cwd\`\n>Session: \`$session_id\`"
+else
+  HEAD="🔔 Claude Code 等输入"
+  BODY="$message\n>Cwd: \`$cwd\`"
+fi
+LINK_LINE=""
+[ -n "$DEEP_LINK" ] && LINK_LINE="\n>[👉 打开 Web 终端]($DEEP_LINK)"
+
+CONTENT="## $HEAD\n${BODY}${LINK_LINE}"
+curl -s -X POST "$WECOM_WEBHOOK" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n --arg c "$(printf '%b' "$CONTENT")" '{msgtype:"markdown", markdown:{content:$c}}')" \
+  > /dev/null 2>&1
 ```
 
-`chmod +x` 一下。tmux-agent 服务必须在跑（`127.0.0.1:7681`）。
-
-### 3. 调试
-
-如果 wall 没闪烁：
+### 4. 调试
 
 - 确认 Claude Code 跑在 tmux 里：`echo $TMUX_PANE` 非空
-- 看 hook 实际收到的 JSON：在脚本顶部加 `cat >> /tmp/claude-hook.log` 看 Claude 发了什么
-- 检查 tmux-agent 收到了：`curl http://127.0.0.1:7681/api/sessions` 应该 200
+- 看 hook 实际收到的 JSON：在脚本顶部加 `{ date; cat; echo; } >> /tmp/claude-hook.log` 复现一次后看 log
+- 检查 tmux-agent 在跑：`curl http://127.0.0.1:7681/api/sessions` 应该 200
+- 检查 publicUrl 配对：`curl http://127.0.0.1:7681/api/config | jq .publicUrl`
 
 ## systemd 一键启动
 
