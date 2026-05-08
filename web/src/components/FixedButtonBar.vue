@@ -1,27 +1,36 @@
 <template>
   <div class="btnbar">
-    <button v-for="b in buttons" :key="b.id" @click="$emit('send', b.payload)">{{ b.label }}</button>
-    <button class="edit" @click="editing = !editing">edit</button>
-    <ButtonEditor v-if="editing" @close="editing = false" @changed="reload" />
+    <button
+      v-for="b in buttons"
+      :key="b.label"
+      :class="b.cls"
+      @click="$emit('send', b.payload)"
+    >{{ b.label }}</button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { api } from '../api';
-import type { Button } from '../types';
-import ButtonEditor from './ButtonEditor.vue';
-
-const buttons = ref<Button[]>([]);
-const editing = ref(false);
 defineEmits<{ (e: 'send', payload: string): void }>();
 
-async function reload() { buttons.value = await api.buttons(); }
-onMounted(reload);
+// Hard-coded reply keys. Previously this was config-driven (and editable from
+// the UI), but the working set converged on these — keep them in code so the
+// layout is stable and there's nothing to misconfigure on a fresh install.
+const buttons = [
+  { label: 'Yes',     payload: 'y\n', cls: 'yes' },
+  { label: 'No',      payload: 'n\n', cls: 'no'  },
+  { label: 'Yes·all', payload: '2\n', cls: 'yes' },
+];
 </script>
 
 <style scoped>
-.btnbar { display: flex; gap: 8px; padding: 8px; flex-wrap: wrap; border-top: 1px solid #222; background: var(--bg-alt); position: relative; }
-.btnbar button { font-weight: 600; }
-.btnbar button.edit { margin-left: auto; font-weight: 400; color: var(--ink-dim); }
+.btnbar {
+  display: flex; gap: 6px; padding: 4px 6px;
+  border-top: 1px solid #222; background: var(--bg-alt);
+}
+.btnbar button {
+  font-weight: 600; font-size: 13px;
+  padding: 6px 12px; min-width: 56px;
+}
+.btnbar button.yes { color: var(--accent); border-color: var(--accent); }
+.btnbar button.no  { color: var(--err);    border-color: var(--err); }
 </style>
