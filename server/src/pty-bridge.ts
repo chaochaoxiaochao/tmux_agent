@@ -15,22 +15,31 @@ export async function registerPtyBridge(app: FastifyInstance) {
     // paint the status bar yellow.
     app.tmux.selectWindow(session, id).catch(() => { /* best effort */ });
 
-    const ptyProc = pty.spawn('tmux', [...tmuxPrefix, 'attach-session', '-t', session], {
-      name: 'xterm-256color',
-      // Start big — most desktop browsers will resize down via the WS resize
-      // message anyway. Starting at 80x24 made tmux 'window-size latest' shrink
-      // the pane during the spawn→resize gap, and Claude Code's HUD lines got
-      // clipped because the pane was briefly that small.
-      cols: 200,
-      rows: 50,
-      cwd: process.env.HOME,
-      env: process.env as any,
-    });
+    let ptyProc: pty.IPty;
+    try {
+      ptyProc = pty.spawn('tmux', [...tmuxPrefix, 'attach-session', '-t', session], {
+        name: 'xterm-256color',
+        // Start big — most desktop browsers will resize down via the WS resize
+        // message anyway. Starting at 80x24 made tmux 'window-size latest' shrink
+        // the pane during the spawn→resize gap, and Claude Code's HUD lines got
+        // clipped because the pane was briefly that small.
+        cols: 200,
+        rows: 50,
+        cwd: process.env.HOME,
+        env: process.env as any,
+      });
+    } catch {
+      try { conn.close(1011, 'pty spawn failed'); } catch { }
+      return;
+    }
+
+    let killFallback: NodeJS.Timeout | null = null;
 
     ptyProc.onData(data => {
       try { conn.send(data, { binary: true }); } catch { /* dead */ }
     });
     ptyProc.onExit(() => {
+      if (killFallback) { clearTimeout(killFallback); killFallback = null; }
       try { conn.close(1011, 'pty exited'); } catch { }
     });
 
@@ -48,7 +57,15 @@ export async function registerPtyBridge(app: FastifyInstance) {
     });
 
     conn.on('close', () => {
+      // SIGHUP gives the tmux client a chance to exit cleanly. If it's stuck in
+      // a syscall (common when WeChat webview drops the WS abruptly), SIGHUP is
+      // ignored — fall back to SIGKILL after 1s so the kernel force-closes the
+      // unix socket fd and tmux server can't end up spinning on an orphan peer.
       try { ptyProc.kill('SIGHUP'); } catch { }
+      killFallback = setTimeout(() => {
+        killFallback = null;
+        try { ptyProc.kill('SIGKILL'); } catch { }
+      }, 1000);
     });
   });
 }
