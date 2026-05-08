@@ -17,8 +17,8 @@ defineEmits<{ (e: 'send', payload: string): void }>();
 // layout is stable and there's nothing to misconfigure on a fresh install.
 const buttons = [
   { label: 'Yes',     payload: 'y\n', cls: 'yes' },
-  { label: 'No',      payload: 'n\n', cls: 'no'  },
   { label: 'Yes·all', payload: '2\n', cls: 'yes' },
+  { label: 'No',      payload: 'n\n', cls: 'no'  },
 ];
 </script>
 
