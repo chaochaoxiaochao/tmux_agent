@@ -7,8 +7,16 @@
         @click="toggleHistory"
         :title="inCopyMode ? 'Exit copy-mode' : 'Enter tmux copy-mode (history)'"
       >📜 {{ inCopyMode ? 'exit' : 'history' }}</button>
-      <button @click="key('PageUp')"   :disabled="!inCopyMode" title="Page up">PgUp</button>
-      <button @click="key('PageDown')" :disabled="!inCopyMode" title="Page down">PgDn</button>
+      <button class="repeat"
+        @pointerdown.prevent="startRepeat('PageUp', $event)"
+        @pointerup.prevent="stopRepeat" @pointerleave="stopRepeat" @pointercancel="stopRepeat"
+        @contextmenu.prevent
+        :disabled="!inCopyMode" title="Page up">PgUp</button>
+      <button class="repeat"
+        @pointerdown.prevent="startRepeat('PageDown', $event)"
+        @pointerup.prevent="stopRepeat" @pointerleave="stopRepeat" @pointercancel="stopRepeat"
+        @contextmenu.prevent
+        :disabled="!inCopyMode" title="Page down">PgDn</button>
       <span class="sep"></span>
       <button class="accent" @click="reply('y\n')" title="Yes">Yes</button>
       <button class="accent" @click="reply('2\n')" title="Yes · all">Yes·all</button>
@@ -18,17 +26,33 @@
       <button class="danger" @click="key('C-c')"    title="Ctrl-C">^C</button>
       <button class="accent" @click="key('Enter')"  title="Enter">⏎</button>
     </div>
-    <div class="dpad">
-      <button class="b-up"    @click="key('Up')"    title="Up">↑</button>
-      <button class="b-left"  @click="key('Left')"  title="Left">←</button>
-      <button class="b-down"  @click="key('Down')"  title="Down">↓</button>
-      <button class="b-right" @click="key('Right')" title="Right">→</button>
+    <div class="dpad" @contextmenu.prevent>
+      <button class="b-up"
+        @pointerdown.prevent="startRepeat('Up', $event)"
+        @pointerup.prevent="stopRepeat" @pointerleave="stopRepeat" @pointercancel="stopRepeat"
+        @contextmenu.prevent
+        title="Up">↑</button>
+      <button class="b-left"
+        @pointerdown.prevent="startRepeat('Left', $event)"
+        @pointerup.prevent="stopRepeat" @pointerleave="stopRepeat" @pointercancel="stopRepeat"
+        @contextmenu.prevent
+        title="Left">←</button>
+      <button class="b-down"
+        @pointerdown.prevent="startRepeat('Down', $event)"
+        @pointerup.prevent="stopRepeat" @pointerleave="stopRepeat" @pointercancel="stopRepeat"
+        @contextmenu.prevent
+        title="Down">↓</button>
+      <button class="b-right"
+        @pointerdown.prevent="startRepeat('Right', $event)"
+        @pointerup.prevent="stopRepeat" @pointerleave="stopRepeat" @pointercancel="stopRepeat"
+        @contextmenu.prevent
+        title="Right">→</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { onBeforeUnmount, ref, watch } from 'vue';
 import { api } from '../api';
 
 const props = defineProps<{ session: string; windowId: string }>();
@@ -63,8 +87,32 @@ async function reply(payload: string) {
   catch (e: any) { alert(e.message); }
 }
 
+// ---- d-pad press-and-hold repeat ----
+// First key fires immediately; after INITIAL_DELAY a setInterval kicks in
+// at REPEAT_INTERVAL until pointerup/leave/cancel. Matches OS keyboard
+// repeat behavior so a quick tap doesn't accidentally fire twice.
+const INITIAL_DELAY = 400;
+const REPEAT_INTERVAL = 90;
+let repeatDelayTimer: ReturnType<typeof setTimeout> | null = null;
+let repeatIntervalTimer: ReturnType<typeof setInterval> | null = null;
+
+function startRepeat(k: string, e: PointerEvent) {
+  // Capture so pointerup fires even if finger slides slightly off the button.
+  (e.currentTarget as Element)?.setPointerCapture?.(e.pointerId);
+  stopRepeat();
+  void key(k);
+  repeatDelayTimer = setTimeout(() => {
+    repeatIntervalTimer = setInterval(() => { void key(k); }, REPEAT_INTERVAL);
+  }, INITIAL_DELAY);
+}
+function stopRepeat() {
+  if (repeatDelayTimer) { clearTimeout(repeatDelayTimer); repeatDelayTimer = null; }
+  if (repeatIntervalTimer) { clearInterval(repeatIntervalTimer); repeatIntervalTimer = null; }
+}
+
 // Reset when window changes
-watch(() => [props.session, props.windowId], () => { inCopyMode.value = false; });
+watch(() => [props.session, props.windowId], () => { inCopyMode.value = false; stopRepeat(); });
+onBeforeUnmount(() => { stopRepeat(); });
 </script>
 
 <style scoped>
@@ -101,6 +149,16 @@ watch(() => [props.session, props.windowId], () => { inCopyMode.value = false; }
   font-size: 14px; font-weight: 600;
   padding: 0; min-width: 0;
   display: flex; align-items: center; justify-content: center;
+}
+/* Press-and-hold auto-repeat targets (d-pad arrows + PgUp/PgDn). Disable
+   the mobile "select / copy / magnifier" callout that otherwise fires
+   on long-press. */
+.scrollctl .dpad button,
+.scrollctl button.repeat {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 .b-up    { grid-column: 2; grid-row: 1; }
 .b-left  { grid-column: 1; grid-row: 2; }
