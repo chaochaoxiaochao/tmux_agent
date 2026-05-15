@@ -72,14 +72,15 @@ server:
 1. 对应 wall tile 黄/蓝闪烁（进 attached view 自动清）
 2. 推一条企微消息，带「打开 Web 终端」可点链接
 
-原理：4 类 hook event 调用同一个 bash 脚本，脚本根据 event 分别推送不同文案 —— 同时 POST `/api/notify` 给 tmux-agent + POST 企微 webhook。
+原理：3 类 hook event 调用同一个 bash 脚本，脚本根据 event + tool_name 分别推送不同文案 —— 同时 POST `/api/notify` 给 tmux-agent + POST 企微 webhook。
 
 | Event | matcher | 何时触发 | 微信文案 |
 |---|---|---|---|
 | `Stop` | `""` (全匹配) | 每个 turn 结束 | ✅ 主人我完成任务了 |
-| `PreToolUse` | `AskUserQuestion` | Claude 主动问用户问题 | ❓ 主人我需要问你 |
-| `PermissionRequest` | `.*` | Edit/Write 等工具权限审批弹窗 | 🔐 主人我需要你批准 X 操作 |
+| `PermissionRequest` | `.*` | Claude 主动问问题(`AskUserQuestion`) **或** Edit/Bash 等工具权限审批弹窗 | ❓ 主人我需要问你 / 🔐 主人我需要你批准 X 操作（按 `tool_name` 分） |
 | `Notification` | `permission_prompt` | 内置工具 notification（实际很少触发，备用） | 🔔 等输入 |
+
+⚠️ **不要**再单独加 `PreToolUse + AskUserQuestion` —— `PermissionRequest` 已经覆盖 `AskUserQuestion`，再加会**同一次 ask 收两条微信**（去重坑）。
 
 **步骤**
 
@@ -94,15 +95,6 @@ server:
         "matcher": "",
         "hooks": [
           { "type": "command", "command": "bash ~/.claude/hooks/notify_wechat.sh" }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [
-          { "type": "command", "command": "bash ~/.claude/hooks/notify_wechat.sh" },
-          { "type": "command", "command": "printf '\\a'" }
         ]
       }
     ],
@@ -129,9 +121,9 @@ server:
 ```
 
 注意:
-- `PermissionRequest` 才是 Claude Code **实际处理工具权限审批**(Edit out-of-workspace / 未 allowlist 的 Bash 等)的事件,**不要**用 `Notification permission_prompt` 替代,后者实际只在内置 notification 流程里触发,Edit 弹 prompt 时不会响。
-- `PreToolUse + AskUserQuestion` 让 Claude 主动问问题时也响。
-- 4 个 event 都指向同一个脚本,脚本内部按 `hook_event_name` 分文案。
+- `PermissionRequest` 才是 Claude Code **实际处理"需要用户决定"**(AskUserQuestion + 工具权限审批)的事件,**不要**用 `Notification permission_prompt` 替代,后者实际只在内置 notification 流程里触发,Edit/Bash 弹 prompt 时不会响。
+- `PermissionRequest matcher=".*"` 同时覆盖 AskUserQuestion 和工具审批两种语义,**不要**再加 `PreToolUse + AskUserQuestion`(那会跟 PermissionRequest 重复触发,同一次 ask 收两条微信)。
+- 3 个 event 都指向同一个脚本,脚本内部按 `hook_event_name + tool_name` 分文案。
 
 3. 拷一份 hook 脚本到 `~/.claude/hooks/notify_wechat.sh` 并 `chmod +x`，模板见 [docs/notify_wechat.sh](docs/notify_wechat.sh)：
 

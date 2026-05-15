@@ -27,12 +27,16 @@ hook_event_name=$(echo "$json_input" | jq -r '.hook_event_name')
 notification_type=$(echo "$json_input" | jq -r '.notification_type // ""')
 tool_name=$(echo "$json_input" | jq -r '.tool_name // ""')
 
-# 本脚本设计支持 4 类事件,对应 settings.json 里的 4 个 hook 入口:
-#   - Notification + matcher="permission_prompt"    (内置工具权限询问的 notification,实际很少触发)
-#   - Stop          + matcher=""                    (Claude 每个 turn 结束)
-#   - PreToolUse    + matcher="AskUserQuestion"     (Claude 主动问用户问题)
-#   - PermissionRequest + matcher=".*"              (Claude Code 真正的"工具权限审批"事件,
-#                                                    Edit out-of-workspace / 未 allowlist 的 Bash 等都走这条)
+# 本脚本设计支持 3 类事件,对应 settings.json 里的 3 个 hook 入口:
+#   - Stop              + matcher=""    (Claude 每个 turn 结束)
+#   - PermissionRequest + matcher=".*"  (Claude Code 实际处理"需要用户决定"的事件;
+#                                        覆盖 AskUserQuestion(Claude 主动问) +
+#                                        工具权限审批(Edit out-of-workspace / 未 allowlist 的 Bash 等)。
+#                                        脚本内部按 tool_name 分文案。)
+#   - Notification + matcher="permission_prompt"    (内置工具的 notification,实际很少触发,备用)
+#
+# 注意:不要再加 PreToolUse + AskUserQuestion —— 那会跟 PermissionRequest 重复触发,
+# 同一次 ask 收两条微信。PermissionRequest 已经覆盖 AskUserQuestion。
 
 # 反查 session_name:hook payload 没这字段,但 ~/.claude/sessions/<pid>.json 里有,
 # 找到 sessionId 匹配那个 (用 /rename 改过会写入 .name);没改过则字段不存在,留空回退用 cwd 末段。
@@ -72,12 +76,16 @@ session_label="${session_name:-$project_short}"
 if [ "$hook_event_name" = "Stop" ]; then
   HEAD="✅ Claude Code 任务完成"
   BODY="主人我完成任务了\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
-elif [ "$hook_event_name" = "PreToolUse" ] && [ "$tool_name" = "AskUserQuestion" ]; then
-  HEAD="❓ Claude Code 需要询问"
-  BODY="主人我需要问你\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
 elif [ "$hook_event_name" = "PermissionRequest" ]; then
-  HEAD="🔐 Claude Code 等权限批准"
-  BODY="主人我需要你批准 \`$tool_name\` 操作\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
+  # PermissionRequest 涵盖所有"需要用户决定"的场景:工具权限审批 + AskUserQuestion。
+  # 按 tool_name 选不同文案,语义更准。
+  if [ "$tool_name" = "AskUserQuestion" ]; then
+    HEAD="❓ Claude Code 需要询问"
+    BODY="主人我需要问你\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
+  else
+    HEAD="🔐 Claude Code 等权限批准"
+    BODY="主人我需要你批准 \`$tool_name\` 操作\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
+  fi
 else
   HEAD="🔔 Claude Code 等输入"
   BODY="$message\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
