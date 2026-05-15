@@ -20,3 +20,4 @@ export interface WallSnapshotSession {
 }
 export interface WallSnapshot { ts: number; sessions: WallSnapshotSession[] }
 export interface UiConfig { accent: string; density: string; commands: CommandItem[]; cwdFallback: string }
+export interface UploadResult { path: string; mimeType: string; size: number }

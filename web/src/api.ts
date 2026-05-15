@@ -1,4 +1,4 @@
-import type { Button, FileItem, SessionMeta, UiConfig, WindowMeta } from './types';
+import type { Button, FileItem, SessionMeta, UiConfig, UploadResult, WindowMeta } from './types';
 
 async function http<T>(method: string, url: string, body?: any): Promise<T> {
   const res = await fetch(url, {
@@ -52,6 +52,12 @@ export const api = {
   createButton: (b: Omit<Button, 'id'>) => http<Button>('POST', '/api/buttons', b),
   updateButton: (id: string, b: Partial<Button>) => http<Button>('PUT', `/api/buttons/${id}`, b),
   deleteButton: (id: string) => http<void>('DELETE', `/api/buttons/${id}`),
+
+  // uploads
+  upload: (session: string, id: string, filename: string, mimeType: string, content: string) =>
+    http<UploadResult>('POST', `${wbase(session)}/${enc(id)}/upload`, { filename, mimeType, content }),
+  deleteUpload: (filePath: string) =>
+    http<void>('DELETE', `/api/upload?path=${enc(filePath)}`),
 
   // completion + config
   files: (q: string) => http<FileItem[]>('GET', `/api/files?q=${enc(q)}`),

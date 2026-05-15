@@ -5,6 +5,7 @@ import { registerWindowsRoutes } from './routes/api.windows.js';
 import { registerButtonsRoutes } from './routes/api.buttons.js';
 import { registerCompletionRoutes } from './routes/api.completion.js';
 import { registerNotifyRoutes } from './routes/api.notify.js';
+import { registerUploadRoutes } from './routes/api.upload.js';
 import { registerPtyBridge } from './pty-bridge.js';
 import { registerWallChannel } from './wall-snapshots.js';
 import fastifyStatic from '@fastify/static';
@@ -30,6 +31,7 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   registerButtonsRoutes(app);
   registerCompletionRoutes(app);
   registerNotifyRoutes(app);
+  await registerUploadRoutes(app);
   await registerPtyBridge(app);
   registerWallChannel(app);
 
