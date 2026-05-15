@@ -25,10 +25,14 @@ session_id=$(echo "$json_input" | jq -r '.session_id')
 cwd=$(echo "$json_input" | jq -r '.cwd')
 hook_event_name=$(echo "$json_input" | jq -r '.hook_event_name')
 notification_type=$(echo "$json_input" | jq -r '.notification_type // ""')
+tool_name=$(echo "$json_input" | jq -r '.tool_name // ""')
 
-# settings.json 已用 matcher="permission_prompt" 在框架层过滤 Notification,
-# 进到这里的 Notification 一定是 permission_prompt;idle_prompt / auth_success / elicitation_*
-# 都被框架拦下。Stop 事件无 matcher 限制,继续走"任务完成"分支。
+# 本脚本设计支持 4 类事件,对应 settings.json 里的 4 个 hook 入口:
+#   - Notification + matcher="permission_prompt"    (内置工具权限询问的 notification,实际很少触发)
+#   - Stop          + matcher=""                    (Claude 每个 turn 结束)
+#   - PreToolUse    + matcher="AskUserQuestion"     (Claude 主动问用户问题)
+#   - PermissionRequest + matcher=".*"              (Claude Code 真正的"工具权限审批"事件,
+#                                                    Edit out-of-workspace / 未 allowlist 的 Bash 等都走这条)
 
 # 反查 session_name:hook payload 没这字段,但 ~/.claude/sessions/<pid>.json 里有,
 # 找到 sessionId 匹配那个 (用 /rename 改过会写入 .name);没改过则字段不存在,留空回退用 cwd 末段。
@@ -68,6 +72,12 @@ session_label="${session_name:-$project_short}"
 if [ "$hook_event_name" = "Stop" ]; then
   HEAD="✅ Claude Code 任务完成"
   BODY="主人我完成任务了\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
+elif [ "$hook_event_name" = "PreToolUse" ] && [ "$tool_name" = "AskUserQuestion" ]; then
+  HEAD="❓ Claude Code 需要询问"
+  BODY="主人我需要问你\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
+elif [ "$hook_event_name" = "PermissionRequest" ]; then
+  HEAD="🔐 Claude Code 等权限批准"
+  BODY="主人我需要你批准 \`$tool_name\` 操作\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
 else
   HEAD="🔔 Claude Code 等输入"
   BODY="$message\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
