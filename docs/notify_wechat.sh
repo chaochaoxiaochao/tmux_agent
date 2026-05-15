@@ -1,0 +1,96 @@
+#!/bin/bash
+# 企业微信通知 Hook - 当 Claude Code 发送通知时，同步推送到企业微信，
+# 同时通知 tmux-agent 让对应 window 在 wall 上闪烁。
+#
+# Install: cp docs/notify_wechat.sh ~/.claude/hooks/ && chmod +x ~/.claude/hooks/notify_wechat.sh
+# 然后改下面的 WECOM_WEBHOOK 为你自己的企微机器人 webhook URL.
+
+json_input=$(cat)
+
+# Debug: log every hook invocation so we can see what Claude actually sends.
+# 默认关闭;要排查时改成 1 再开。
+DEBUG_AUDIT=0
+if [ "$DEBUG_AUDIT" = "1" ]; then
+  LOG=/tmp/claude-hook-debug.log
+  {
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S.%3N') ==="
+    echo "$json_input"
+    echo
+  } >> "$LOG"
+fi
+
+message=$(echo "$json_input" | jq -r '.message')
+title=$(echo "$json_input" | jq -r '.title')
+session_id=$(echo "$json_input" | jq -r '.session_id')
+cwd=$(echo "$json_input" | jq -r '.cwd')
+hook_event_name=$(echo "$json_input" | jq -r '.hook_event_name')
+notification_type=$(echo "$json_input" | jq -r '.notification_type // ""')
+
+# settings.json 已用 matcher="permission_prompt" 在框架层过滤 Notification,
+# 进到这里的 Notification 一定是 permission_prompt;idle_prompt / auth_success / elicitation_*
+# 都被框架拦下。Stop 事件无 matcher 限制,继续走"任务完成"分支。
+
+# 反查 session_name:hook payload 没这字段,但 ~/.claude/sessions/<pid>.json 里有,
+# 找到 sessionId 匹配那个 (用 /rename 改过会写入 .name);没改过则字段不存在,留空回退用 cwd 末段。
+session_name=$(jq -r --arg sid "$session_id" 'select(.sessionId==$sid) | .name // empty' \
+  ~/.claude/sessions/*.json 2>/dev/null | head -1)
+project_short=$(basename "$cwd")
+
+# 解析当前 tmux pane → session/window-id（用来戳 tmux-agent，也用于 deep link）
+TMUX_AGENT_URL="${TMUX_AGENT_URL:-http://127.0.0.1:7681}"
+TMUX_S=""
+TMUX_W=""
+if [ -n "$TMUX_PANE" ]; then
+  target=$(tmux display-message -p -t "$TMUX_PANE" '#{session_name},#{window_id}' 2>/dev/null)
+  if [ -n "$target" ]; then
+    TMUX_S="${target%%,*}"
+    TMUX_W="${target##*,}"
+  fi
+fi
+
+# 从 tmux-agent /api/config 拿外部可访问的 publicUrl，没配就回退本机 URL（手机点不开但消息不会缺）
+PUBLIC_URL=$(curl -s "$TMUX_AGENT_URL/api/config" 2>/dev/null | jq -r '.publicUrl // empty')
+[ -z "$PUBLIC_URL" ] && PUBLIC_URL="$TMUX_AGENT_URL"
+
+# 拼 deep link（带 hash 路由）。jq -rR 用来 URL-encode 段。
+url_encode() { jq -rRn --arg s "$1" '$s|@uri'; }
+DEEP_LINK=""
+if [ -n "$TMUX_S" ] && [ -n "$TMUX_W" ]; then
+  DEEP_LINK="$PUBLIC_URL/#/w/$(url_encode "$TMUX_S")/$(url_encode "$TMUX_W")"
+fi
+
+# 组装企微 markdown 消息
+# !!! 改成你自己的企微机器人 webhook URL !!!
+# 群机器人 → 添加 → 选择「群机器人」→ 复制 webhook URL
+WECOM_WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+# Session 行: 优先 session_name (用户 /rename 设的);没设则 fallback "<cwd末段>".
+session_label="${session_name:-$project_short}"
+if [ "$hook_event_name" = "Stop" ]; then
+  HEAD="✅ Claude Code 任务完成"
+  BODY="主人我完成任务了\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
+else
+  HEAD="🔔 Claude Code 等输入"
+  BODY="$message\n>Session: \`$session_label\`\n>Cwd: \`$cwd\`"
+fi
+LINK_LINE=""
+[ -n "$DEEP_LINK" ] && LINK_LINE="\n>[👉 打开 Web 终端]($DEEP_LINK)"
+
+CONTENT="## $HEAD\n${BODY}${LINK_LINE}"
+
+curl -s -X POST "$WECOM_WEBHOOK" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n --arg c "$(printf '%b' "$CONTENT")" '{msgtype:"markdown", markdown:{content:$c}}')" \
+  > /dev/null 2>&1
+
+# 通知 tmux-agent 让对应 window tile 闪烁
+if [ -n "$TMUX_S" ] && [ -n "$TMUX_W" ]; then
+  if [ "$hook_event_name" = "Stop" ]; then
+    kind="done"
+  else
+    kind="input-needed"
+  fi
+  curl -sX POST "$TMUX_AGENT_URL/api/notify" \
+    -H 'content-type: application/json' \
+    -d "{\"session\":\"$TMUX_S\",\"windowId\":\"$TMUX_W\",\"kind\":\"$kind\"}" \
+    > /dev/null 2>&1 &
+fi
