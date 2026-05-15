@@ -10,9 +10,13 @@
       <button @click="key('PageUp')"   :disabled="!inCopyMode" title="Page up">PgUp</button>
       <button @click="key('PageDown')" :disabled="!inCopyMode" title="Page down">PgDn</button>
       <span class="sep"></span>
+      <button class="accent" @click="reply('y\n')" title="Yes">Yes</button>
+      <button class="accent" @click="reply('2\n')" title="Yes · all">Yes·all</button>
+      <button class="danger" @click="reply('n\n')" title="No">No</button>
+      <span class="sep"></span>
       <button @click="key('Escape')" title="Escape">Esc</button>
-      <button @click="key('C-c')"    title="Ctrl-C">^C</button>
-      <button @click="key('Enter')"  title="Enter">⏎</button>
+      <button class="danger" @click="key('C-c')"    title="Ctrl-C">^C</button>
+      <button class="accent" @click="key('Enter')"  title="Enter">⏎</button>
     </div>
     <div class="dpad">
       <button class="b-up"    @click="key('Up')"    title="Up">↑</button>
@@ -54,6 +58,11 @@ async function key(k: string) {
   catch (e: any) { alert(e.message); }
 }
 
+async function reply(payload: string) {
+  try { await api.send(props.session, props.windowId, payload); }
+  catch (e: any) { alert(e.message); }
+}
+
 // Reset when window changes
 watch(() => [props.session, props.windowId], () => { inCopyMode.value = false; });
 </script>
@@ -61,7 +70,7 @@ watch(() => [props.session, props.windowId], () => { inCopyMode.value = false; }
 <style scoped>
 .scrollctl {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; padding: 4px 6px;
+  gap: 8px; padding: 4px 6px 4px 16px;
   border-top: 1px solid #222;
   background: var(--bg-alt);
 }
@@ -75,6 +84,8 @@ watch(() => [props.session, props.windowId], () => { inCopyMode.value = false; }
 }
 .scrollctl button.primary { color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .scrollctl button.primary.active { background: var(--accent); color: #000; }
+.scrollctl button.accent  { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.scrollctl button.danger  { color: var(--err);    border-color: var(--err);    font-weight: 600; }
 .scrollctl button:disabled { opacity: 0.4; cursor: default; }
 .sep { width: 1px; align-self: stretch; background: var(--ink-faint); margin: 2px 4px; opacity: 0.5; }
 
