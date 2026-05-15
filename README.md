@@ -105,7 +105,17 @@ server:
 
 `matcher: "permission_prompt"` 在框架层过滤掉 `idle_prompt`（定时催促）等噪音事件，避免误报。
 
-3. 拷一份 hook 脚本到 `~/.claude/hooks/notify_wechat.sh` 并 `chmod +x`，模板见 [docs/notify_wechat.sh](docs/notify_wechat.sh)。脚本里改 `WECOM_WEBHOOK` 为你的企微机器人 webhook（群机器人 → 添加 → 复制 URL）。
+3. 拷一份 hook 脚本到 `~/.claude/hooks/notify_wechat.sh` 并 `chmod +x`，模板见 [docs/notify_wechat.sh](docs/notify_wechat.sh)：
+
+   ```bash
+   cp docs/notify_wechat.sh ~/.claude/hooks/
+   chmod +x ~/.claude/hooks/notify_wechat.sh
+   ```
+
+4. **拿一个企微机器人 webhook URL** —— 这是必填的，不配的话啥消息都收不到：
+   - 企业微信群 → 群设置 → 群机器人 → 添加机器人 → 创建后复制 Webhook 地址
+   - 形如 `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxxxx-...`
+   - 打开 `~/.claude/hooks/notify_wechat.sh`，把第 65 行附近的 `WECOM_WEBHOOK="https://...key=xxxx..."` 改成你刚拿到的 URL
 
 **调试**
 
