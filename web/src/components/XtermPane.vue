@@ -6,6 +6,7 @@
          keyboard with no way to dismiss it). Click bubbles up as @tap so the
          parent can open InputDialog. Hidden on desktop via @media. -->
     <div class="tap-overlay" @click="$emit('tap')"></div>
+
   </div>
 </template>
 
@@ -25,38 +26,109 @@ let fit: FitAddon | null = null;
 let ws: ReconnectingWS | null = null;
 let ro: ResizeObserver | null = null;
 
+// --- diagnostic instrumentation ---
+// Records every ws state change / resize / received-frame into a ring
+// buffer (last 200 entries). The "🐞" button in AttachedView's header
+// posts the buffer to /api/debug-dump so we can read it server-side
+// without needing a remote-inspect setup. Frame events are NOT throttled
+// here — we want full fidelity for diagnosis — but they're cheap (a
+// single push, no DOM update, no string formatting in hot path).
+const TAG = '[xterm-pane]';
+const RING_MAX = 200;
+const ring: string[] = [];
+
+function fmtTime() {
+  const d = new Date();
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  return `${d.toLocaleTimeString('en-GB', { hour12: false })}.${ms}`;
+}
+function dbg(...args: any[]) {
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  const line = `${fmtTime()} ${msg}`;
+  ring.push(line);
+  if (ring.length > RING_MAX) ring.shift();
+  // Also mirror to console when explicitly opted in (desktop debugging).
+  if (typeof window !== 'undefined' && window.localStorage?.getItem('PTY_DEBUG') === '1') {
+    console.log(TAG, msg);
+  }
+}
+
+function recordFrame(size: number) {
+  dbg(`rx ${size}B`);
+}
+
+// Exposed for AttachedView's 🐞 button. Returns the current ring contents
+// plus a snapshot of terminal state at the moment of capture.
+defineExpose({
+  collectDiagnostics() {
+    return {
+      session: props.session,
+      windowId: props.windowId,
+      ts: new Date().toISOString(),
+      cols: term?.cols ?? null,
+      rows: term?.rows ?? null,
+      readyState: (ws as any)?.sock?.readyState ?? null,
+      userAgent: navigator.userAgent,
+      visualViewport: (window as any).visualViewport
+        ? { w: (window as any).visualViewport.width, h: (window as any).visualViewport.height }
+        : null,
+      window: { w: window.innerWidth, h: window.innerHeight },
+      ring: ring.slice(),
+    };
+  },
+});
+
 function wsUrl(session: string, id: string) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   return `${proto}://${location.host}/ws/term/${encodeURIComponent(session)}/${encodeURIComponent(id)}`;
 }
 
-function sendResize() {
+function sendResize(reason?: string) {
   if (!term || !ws) return;
+  dbg(`resize → ${term.cols}x${term.rows}${reason ? ` (${reason})` : ''}`);
   ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
 }
 
-function refit() {
+function refit(reason?: string) {
   if (!fit || !term) return;
   fit.fit();
-  sendResize();
+  sendResize(reason);
 }
 
 function connect() {
   ws?.close();
+  dbg(`connect → ${props.session}:${props.windowId}`);
   ws = new ReconnectingWS(wsUrl(props.session, props.windowId), {
     onMessage: data => {
-      if (data instanceof ArrayBuffer) term?.write(new Uint8Array(data));
+      if (data instanceof ArrayBuffer) {
+        recordFrame(data.byteLength);
+        term?.write(new Uint8Array(data));
+      } else {
+        dbg('rx non-binary frame:', typeof data, data);
+      }
+    },
+    onStatus: s => {
+      dbg(`ws status: ${s}`);
+      // ws.onopen also fires for reconnects (e.g. mobile webview killing
+      // idle sockets). The server's new PTY starts at its default cols/rows
+      // — we MUST re-send our actual size or the next burst of output gets
+      // rendered with cursor coordinates meant for a 200x50 pane inside our
+      // 46x29 viewport. That's the "garbled lines after the screen was
+      // idle" symptom on iOS / WeWork / Telegram webviews.
+      if (s === 'open') sendResize('ws-open');
     },
   });
   // Layout often isn't fully stable on first paint (font metrics still
   // loading, dvh adjusting after attach view mounts). Re-fit a few times
   // so xterm reaches its final cols/rows before tmux locks in pane size.
-  setTimeout(refit, 100);
-  setTimeout(refit, 400);
-  setTimeout(refit, 1000);
+  setTimeout(() => refit('boot-100ms'), 100);
+  setTimeout(() => refit('boot-400ms'), 400);
+  setTimeout(() => refit('boot-1000ms'), 1000);
 }
 
-const onWinResize = () => refit();
+const onWinResize = () => refit('window-resize');
+const onOrientation = () => refit('orientationchange');
+const onVisualViewport = () => refit('visualViewport');
 
 onMounted(() => {
   if (!root.value) return;
@@ -75,18 +147,19 @@ onMounted(() => {
 
   term.onData(d => ws?.send(new TextEncoder().encode(d)));
 
-  ro = new ResizeObserver(() => { fit?.fit(); sendResize(); });
+  ro = new ResizeObserver(() => { fit?.fit(); sendResize('resize-observer'); });
   ro.observe(root.value);
   window.addEventListener('resize', onWinResize);
-  window.addEventListener('orientationchange', onWinResize);
-  (window as any).visualViewport?.addEventListener?.('resize', onWinResize);
+  window.addEventListener('orientationchange', onOrientation);
+  (window as any).visualViewport?.addEventListener?.('resize', onVisualViewport);
 });
 
 onUnmounted(() => {
+  dbg('unmount');
   ro?.disconnect();
   window.removeEventListener('resize', onWinResize);
-  window.removeEventListener('orientationchange', onWinResize);
-  (window as any).visualViewport?.removeEventListener?.('resize', onWinResize);
+  window.removeEventListener('orientationchange', onOrientation);
+  (window as any).visualViewport?.removeEventListener?.('resize', onVisualViewport);
   ws?.close();
   term?.dispose();
 });
@@ -121,4 +194,5 @@ watch(() => [props.session, props.windowId], () => connect());
     cursor: pointer;
   }
 }
+
 </style>
