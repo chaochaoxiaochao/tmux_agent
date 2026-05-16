@@ -9,10 +9,17 @@
     <header class="bar">
       <button @click="$router.push('/')">← wall</button>
       <span class="bc">{{ session }} : {{ id }}</span>
+      <span class="spacer"></span>
+      <button class="bug" :class="bugState" @click="dumpDiag" :disabled="bugState === 'loading'" :title="bugTitle">
+        <span v-if="bugState === 'loading'">⏳ saving…</span>
+        <span v-else-if="bugState === 'ok'">✓ saved</span>
+        <span v-else-if="bugState === 'err'">✗ failed</span>
+        <span v-else>🐞 debug</span>
+      </button>
     </header>
     <PaneStrip :session="session" :window-id="id" />
     <div class="body">
-      <div class="term-area"><XtermPane :session="session" :window-id="id" @tap="dialogOpen = true" /></div>
+      <div class="term-area"><XtermPane ref="xterm" :session="session" :window-id="id" @tap="dialogOpen = true" /></div>
     </div>
     <ScrollControls :session="session" :window-id="id" />
     <InputDialog
@@ -47,6 +54,45 @@ const dialogOpen = ref(false);
 const pendingFiles = ref<File[]>([]);
 const dragActive = ref(false);
 let dragDepth = 0;
+
+// XtermPane ref so the 🐞 button can pull its diagnostic ring buffer.
+const xterm = ref<InstanceType<typeof XtermPane> | null>(null);
+const bugState = ref<'' | 'loading' | 'ok' | 'err'>('');
+const bugTitle = ref('dump diagnostics to server log');
+
+async function dumpDiag() {
+  // Guard against double-click while a request is in flight.
+  if (bugState.value === 'loading') return;
+
+  const collector = xterm.value?.collectDiagnostics as (() => any) | undefined;
+  if (!collector) {
+    bugTitle.value = 'xterm not ready';
+    bugState.value = 'err';
+    setTimeout(() => { bugState.value = ''; }, 2500);
+    return;
+  }
+
+  bugState.value = 'loading';
+  bugTitle.value = 'uploading…';
+
+  const payload = collector();
+  try {
+    const r = await fetch('/api/debug-dump', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const { path } = await r.json();
+    bugTitle.value = `saved: ${path}`;
+    bugState.value = 'ok';
+  } catch (e: any) {
+    bugTitle.value = `failed: ${e.message ?? e}`;
+    bugState.value = 'err';
+  }
+  // Stay visible long enough that the user can read it after a mobile tap.
+  setTimeout(() => { bugState.value = ''; }, 2500);
+}
 
 const dropHintText = computed(() =>
   dialogOpen.value ? 'drop to attach' : 'drop to paste @path into terminal',
@@ -145,6 +191,21 @@ watch(dialogOpen, (v) => { if (!v) pendingFiles.value = []; });
 .attached { display: flex; flex-direction: column; height: 100%; position: relative; }
 .bar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid #222; }
 .bc { color: var(--ink-dim); font: 12px ui-monospace, monospace; }
+.bar .spacer { flex: 1; }
+.bar .bug {
+  font-size: 13px; padding: 4px 10px;
+  min-width: 88px;             /* fixed width so state changes don't jitter neighbors */
+  background: transparent; border: 1px solid var(--ink-faint); color: var(--ink-dim);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.bar .bug:hover  { color: var(--ink); border-color: var(--ink-dim); }
+.bar .bug:active { background: rgba(255, 255, 255, 0.1); }   /* press feedback */
+.bar .bug:disabled { cursor: wait; }
+.bar .bug.loading { background: var(--ink-faint); color: var(--ink); border-color: var(--ink-dim); }
+.bar .bug.ok  { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+.bar .bug.err { background: var(--err);    color: #fff; border-color: var(--err);    font-weight: 700; }
 .body { display: flex; flex: 1; min-height: 0; }
 .term-area { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 
