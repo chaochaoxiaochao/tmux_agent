@@ -14,5 +14,5 @@ export function evaluateStatus(
       if (r.re.test(line)) return r.status;
     }
   }
-  return lastOutputAgeMs < 5000 ? 'running' : 'idle';
+  return lastOutputAgeMs < 2000 ? 'running' : 'idle';
 }

@@ -1,5 +1,5 @@
 <template>
-  <div class="scrollctl">
+  <div class="scrollctl" @contextmenu.prevent>
     <div class="left">
       <button
         class="primary"
@@ -129,6 +129,14 @@ onBeforeUnmount(() => { stopRepeat(); });
 .scrollctl button {
   font: 12px ui-monospace, monospace;
   padding: 5px 10px; min-width: 40px;
+  /* All buttons in this strip suppress the mobile long-press callout
+     (select / copy / magnifier). Only the d-pad arrows and PgUp/PgDn
+     actually act on press-and-hold (auto-repeat); everywhere else a
+     long-press is just a slow tap. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 .scrollctl button.primary { color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .scrollctl button.primary.active { background: var(--accent); color: #000; }
@@ -149,16 +157,6 @@ onBeforeUnmount(() => { stopRepeat(); });
   font-size: 14px; font-weight: 600;
   padding: 0; min-width: 0;
   display: flex; align-items: center; justify-content: center;
-}
-/* Press-and-hold auto-repeat targets (d-pad arrows + PgUp/PgDn). Disable
-   the mobile "select / copy / magnifier" callout that otherwise fires
-   on long-press. */
-.scrollctl .dpad button,
-.scrollctl button.repeat {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  touch-action: manipulation;
 }
 .b-up    { grid-column: 2; grid-row: 1; }
 .b-left  { grid-column: 1; grid-row: 2; }

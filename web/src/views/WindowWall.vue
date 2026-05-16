@@ -53,12 +53,19 @@ const router = useRouter();
 const newSessionName = ref<string>('claude');
 
 // Sort key for a window: lower = more interesting / earlier in list.
-// 1. attention (INPUT/DONE pulsing) wins — push to top
-// 2. then by lastOutputAgeMs ascending (live before idle)
-// 3. tiebreak by tmux window index (preserve native order)
+// Bucketing keeps the order stable when nothing important is happening:
+// 1. attention (INPUT/DONE pulsing) — top, sorted by age within bucket
+// 2. running — by age, freshest first
+// 3. idle — by tmux index, NO age-based ordering
+//
+// Earlier versions sorted everything by lastOutputAgeMs, but a spinner
+// or clock in one pane is enough to keep its ageMs bouncing while the
+// rest sit at "n seconds since last change". Result: a wall of grey
+// idle tiles still reshuffled every second. Bucketing fixes that.
 function windowSortKey(w: WallSnapshotWindow): [number, number, number] {
-  const attentionRank = w.attention ? 0 : 1;
-  return [attentionRank, w.lastOutputAgeMs, w.index];
+  if (w.attention) return [0, w.lastOutputAgeMs, w.index];
+  if (w.status === 'running') return [1, w.lastOutputAgeMs, w.index];
+  return [2, w.index, 0];   // idle: tmux index only
 }
 function compareTuple(a: number[], b: number[]): number {
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
@@ -70,15 +77,20 @@ function sortedWindows(ws: WallSnapshotWindow[]): WallSnapshotWindow[] {
 }
 
 // Sort key for a session: lower = earlier in list.
-// 1. has any window with attention -> top
-// 2. then by min lastOutputAgeMs across the session (most-recent activity)
-// 3. tiebreak by name for stability
+// Same bucketing idea: only sort by liveness when something is actually
+// running. Otherwise sessions sort by name — stable across ticks.
+// 1. has attention -> top
+// 2. has at least one running window -> next, sorted by min age
+// 3. all idle -> alphabetical
 function sessionSortKey(s: WallSnapshotSession): [number, number, string] {
-  const hasAttention = s.windows.some(w => !!w.attention) ? 0 : 1;
-  const minAge = s.windows.length
-    ? Math.min(...s.windows.map(w => w.lastOutputAgeMs))
-    : Number.POSITIVE_INFINITY;
-  return [hasAttention, minAge, s.name];
+  const hasAttention = s.windows.some(w => !!w.attention);
+  if (hasAttention) {
+    const minAge = Math.min(...s.windows.map(w => w.lastOutputAgeMs));
+    return [0, minAge, s.name];
+  }
+  const runningAges = s.windows.filter(w => w.status === 'running').map(w => w.lastOutputAgeMs);
+  if (runningAges.length) return [1, Math.min(...runningAges), s.name];
+  return [2, 0, s.name];
 }
 function compareSession(a: WallSnapshotSession, b: WallSnapshotSession): number {
   const [aA, aB, aC] = sessionSortKey(a);
