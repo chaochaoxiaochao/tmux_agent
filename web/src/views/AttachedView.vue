@@ -19,9 +19,10 @@
     </header>
     <PaneStrip :session="session" :window-id="id" />
     <div class="body">
-      <div class="term-area"><XtermPane ref="xterm" :session="session" :window-id="id" @tap="dialogOpen = true" /></div>
+      <div class="term-area"><XtermPane ref="xterm" :session="session" :window-id="id" /></div>
     </div>
     <ScrollControls :session="session" :window-id="id" />
+    <AttachedComposer :session="session" :window-id="id" />
     <InputDialog
       v-model:open="dialogOpen"
       :session="session"
@@ -45,6 +46,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import XtermPane from '../components/XtermPane.vue';
 import ScrollControls from '../components/ScrollControls.vue';
+import AttachedComposer from '../components/AttachedComposer.vue';
 import InputDialog from '../components/InputDialog.vue';
 import PaneStrip from '../components/PaneStrip.vue';
 import { api } from '../api';
