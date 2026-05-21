@@ -1,8 +1,8 @@
 <template>
-  <div v-if="panes.length > 1" class="strip">
+  <div v-if="props.panes.length > 1" class="strip">
     <span class="label">panes</span>
     <button
-      v-for="p in panes"
+      v-for="p in props.panes"
       :key="p.id"
       class="pane"
       :class="{ active: p.active }"
@@ -16,23 +16,16 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
 import { api } from '../api';
+import type { PaneMetaItem } from '../types';
 
-interface Pane { id: string; index: number; active: boolean; size: string; cmd: string }
-
-const props = defineProps<{ session: string; windowId: string }>();
-const panes = ref<Pane[]>([]);
-
-async function refresh() {
-  try { panes.value = await api.panes(props.session, props.windowId); }
-  catch { panes.value = []; }
-}
+const props = defineProps<{ session: string; windowId: string; panes: PaneMetaItem[] }>();
 
 // Click switches active pane and toggles zoom on it. Re-clicking the same
 // active pane just toggles zoom. Backend treats select-pane + resize-pane -Z
-// as separate calls; we do them in sequence.
-async function onClick(p: Pane) {
+// as separate calls; we do them in sequence. AttachedView receives the
+// updated panes via the WS pane-meta frame triggered by the backend.
+async function onClick(p: PaneMetaItem) {
   try {
     if (!p.active) {
       await api.selectPane(props.session, props.windowId, p.id);
@@ -41,19 +34,7 @@ async function onClick(p: Pane) {
   } catch (e: any) {
     alert(e.message);
   }
-  setTimeout(refresh, 200);
 }
-
-onMounted(refresh);
-watch(() => [props.session, props.windowId], refresh);
-
-// Re-fetch periodically so cmd / active reflect what tmux sees
-let timer: number | undefined;
-onMounted(() => { timer = window.setInterval(refresh, 3000); });
-import { onUnmounted } from 'vue';
-onUnmounted(() => { if (timer) clearInterval(timer); });
-
-defineExpose({ refresh });
 </script>
 
 <style scoped>
