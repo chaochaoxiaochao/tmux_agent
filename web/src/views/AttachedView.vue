@@ -67,9 +67,7 @@ const xterm = ref<InstanceType<typeof XtermPane> | null>(null);
 const composer = ref<InstanceType<typeof AttachedComposer> | null>(null);
 
 function onSlashMenuList(payload: { items: SlashMenuItem[] }) {
-  // Cast: AttachedComposer will defineExpose onSlashMenuList in Task 6. Until
-  // then the type doesn't know about it; optional chaining keeps runtime safe.
-  (composer.value as any)?.onSlashMenuList?.(payload);
+  composer.value?.onSlashMenuList(payload);
 }
 const bugState = ref<'' | 'loading' | 'ok' | 'err'>('');
 const bugTitle = ref('dump diagnostics to server log');

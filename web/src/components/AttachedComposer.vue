@@ -56,7 +56,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { api } from '../api';
 import MentionPicker from './MentionPicker.vue';
-import type { CompletionItem } from '../types';
+import type { CompletionItem, SlashMenuItem } from '../types';
 
 const props = defineProps<{
   session: string;
@@ -235,6 +235,8 @@ watch(text, () => nextTick(autoGrow));
 const completionItems = ref<CompletionItem[]>([]);
 const completionActive = ref(0);
 const completionTrigger = ref<'/' | '@' | null>(null);
+const slashMenuCache = ref<SlashMenuItem[]>([]);
+let justPickedSlash = false;
 
 function detectTrigger(): { char: '/' | '@'; suffix: string } | null {
   const v = text.value;
@@ -250,6 +252,11 @@ function detectTrigger(): { char: '/' | '@'; suffix: string } | null {
 // 多实例同页会互相吞掉补全请求。包成 ref 让每个 instance 独立。)
 const completionToken = ref(0);
 watch(text, async () => {
+  // pickCompletion 刚选中 / item 填回 textarea 之后,守卫一次防止浮层重弹
+  if (justPickedSlash) {
+    justPickedSlash = false;
+    return;
+  }
   const trig = detectTrigger();
   if (!trig) {
     completionItems.value = [];
@@ -259,9 +266,21 @@ watch(text, async () => {
   completionTrigger.value = trig.char;
   const token = ++completionToken.value;
   try {
-    const items: CompletionItem[] = trig.char === '@'
-      ? await api.files(trig.suffix)
-      : []; // '/' 分支由 Task 6 用 prewarm cache 接上 — 过渡态返回空
+    let items: CompletionItem[];
+    if (trig.char === '@') {
+      items = await api.files(trig.suffix);
+    } else {
+      // '/': 纯前端过滤 prewarm cache
+      const q = trig.suffix.toLowerCase();
+      items = slashMenuCache.value
+        .filter(it => it.name.toLowerCase().startsWith(q))
+        .map(it => ({
+          kind: 'command' as const,
+          name: it.name,
+          hint: it.desc ?? '',
+          payload: '/' + it.name + ' ', // 跟 @ 一致,尾空格让用户继续追加
+        }));
+    }
     // 防止旧请求晚到覆盖新结果
     if (token !== completionToken.value) return;
     completionItems.value = items;
@@ -282,12 +301,19 @@ function pickCompletion(it: CompletionItem) {
     text.value = before + `@${it.path} `;
   } else {
     // /cmd: 替换为 payload,留框内等用户再按 send (与 Wall InputBar 历史行为一致)
+    justPickedSlash = true; // 防止 watcher 看到 text 变化又把浮层弹回来
     text.value = before + it.payload;
   }
   completionItems.value = [];
   completionTrigger.value = null;
   nextTick(() => inputEl.value?.focus());
 }
+
+function onSlashMenuList(payload: { items: SlashMenuItem[] }) {
+  slashMenuCache.value = payload.items;
+}
+
+defineExpose({ onSlashMenuList });
 
 async function send() {
   if (!canSend.value) return;
