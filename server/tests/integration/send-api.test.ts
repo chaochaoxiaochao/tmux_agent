@@ -14,7 +14,7 @@ beforeEach(async () => {
     server: { host: '127.0.0.1', port: 0 },
     tmux: { session: '', cwdFallback: '/tmp', socket: fx.socket } as any,
     ui: { accent: 'green', density: 'comfortable' },
-    buttons: [], commands: [], statusRules: [],
+    buttons: [], statusRules: [],
     log: { level: 'info', file: '/tmp/tmux-agent-test.log' },
   } as any);
 });

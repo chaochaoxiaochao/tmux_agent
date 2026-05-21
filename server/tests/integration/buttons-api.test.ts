@@ -17,7 +17,7 @@ beforeEach(async () => {
     tmux: { session: 'noop', cwdFallback: '/tmp' } as any,
     ui: { accent: 'green', density: 'comfortable' },
     buttons: [{ id: 'btn-yes', label: 'Yes', payload: 'y\n' }],
-    commands: [], statusRules: [],
+    statusRules: [],
     log: { level: 'info', file: '/tmp/tmux-agent-test.log' },
     configPath: cfgPath,
   } as any);

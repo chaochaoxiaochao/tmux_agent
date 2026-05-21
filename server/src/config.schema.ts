@@ -18,8 +18,8 @@ export const DEFAULT_CONFIG: Config = {
     { id: 'btn-yes', label: 'Yes', payload: 'y\n' },
     { id: 'btn-no', label: 'No', payload: 'n\n' },
     { id: 'btn-yes-all', label: 'Yes·all', payload: '2\n' },
-    { id: 'btn-esc', label: 'Esc', payload: '' },
-    { id: 'btn-ctrl-c', label: 'Ctrl+C', payload: '' },
+    { id: 'btn-esc', label: 'Esc', payload: '\x1b' },
+    { id: 'btn-ctrl-c', label: 'Ctrl+C', payload: '\x03' },
   ],
   // Empty by default. Wall tile color falls back to running/idle
   // (lastOutputAgeMs < 5s = green, else gray). External hooks

@@ -18,7 +18,6 @@ beforeEach(async () => {
     tmux: { session: 'noop', cwdFallback: root } as any,
     ui: { accent: 'green', density: 'comfortable' },
     buttons: [],
-    commands: [{ name: 'commit', hint: 'git commit', payload: 'git commit\n' }],
     statusRules: [],
     log: { level: 'info', file: '/tmp/tmux-agent-test.log' },
   } as any);
@@ -31,11 +30,6 @@ describe('completion API', () => {
     expect(r.statusCode).toBe(200);
     const body = r.json();
     expect(body.some((f: any) => f.path.includes('auth'))).toBe(true);
-  });
-
-  it('GET /api/commands filters', async () => {
-    const r = await app.inject({ method: 'GET', url: '/api/commands?q=co' });
-    expect(r.json().some((c: any) => c.name === 'commit')).toBe(true);
   });
 
   it('rejects cwd outside cwdFallback', async () => {
