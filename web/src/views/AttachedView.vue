@@ -19,10 +19,17 @@
     </header>
     <PaneStrip :session="session" :window-id="id" />
     <div class="body">
-      <div class="term-area"><XtermPane ref="xterm" :session="session" :window-id="id" /></div>
+      <div class="term-area"><XtermPane
+        ref="xterm"
+        :session="session"
+        :window-id="id"
+        @slash-menu="onSlashMenu"
+        @slash-menu-close="onSlashMenuClose"
+      /></div>
     </div>
     <ScrollControls :session="session" :window-id="id" />
     <AttachedComposer
+      ref="composer"
       :session="session"
       :window-id="id"
       :pending-files="pendingFiles"
@@ -47,6 +54,7 @@ import ScrollControls from '../components/ScrollControls.vue';
 import AttachedComposer from '../components/AttachedComposer.vue';
 import PaneStrip from '../components/PaneStrip.vue';
 import { api } from '../api';
+import type { SlashMenuItem } from '../types';
 
 const props = defineProps<{ session: string; id: string }>();
 const pendingFiles = ref<File[]>([]);
@@ -55,6 +63,19 @@ let dragDepth = 0;
 
 // XtermPane ref so the 🐞 button can pull its diagnostic ring buffer.
 const xterm = ref<InstanceType<typeof XtermPane> | null>(null);
+// AttachedComposer ref so we can forward XtermPane's slash-menu events into
+// the composer's slash-mirror state machine (methods exposed in Task 6).
+const composer = ref<InstanceType<typeof AttachedComposer> | null>(null);
+
+function onSlashMenu(payload: { items: SlashMenuItem[]; active: number }) {
+  // Cast: AttachedComposer will defineExpose these methods in Task 6. Until
+  // then the type doesn't know about them, but optional chaining at runtime
+  // keeps this safe.
+  (composer.value as any)?.onSlashMenu?.(payload);
+}
+function onSlashMenuClose() {
+  (composer.value as any)?.onSlashMenuClose?.();
+}
 const bugState = ref<'' | 'loading' | 'ok' | 'err'>('');
 const bugTitle = ref('dump diagnostics to server log');
 
