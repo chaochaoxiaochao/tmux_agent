@@ -62,4 +62,9 @@ export const api = {
   // completion + config
   files: (q: string) => http<FileItem[]>('GET', `/api/files?q=${enc(q)}`),
   config: () => http<UiConfig>('GET', '/api/config'),
+
+  // slash menu refresh (force-revalidate cwd cache + return new list)
+  slashRefresh: (session: string, windowId: string) =>
+    http<{ items: { name: string; desc?: string }[] }>(
+      'POST', '/api/slash-menu/refresh', { session, windowId }),
 };

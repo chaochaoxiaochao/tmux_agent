@@ -7,6 +7,7 @@ import { registerCompletionRoutes } from './routes/api.completion.js';
 import { registerNotifyRoutes } from './routes/api.notify.js';
 import { registerUploadRoutes } from './routes/api.upload.js';
 import { registerDebugRoutes } from './routes/api.debug.js';
+import { registerSlashRoutes } from './routes/api.slash.js';
 import { registerPtyBridge } from './pty-bridge.js';
 import { registerWallChannel } from './wall-snapshots.js';
 import fastifyStatic from '@fastify/static';
@@ -34,6 +35,7 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   registerNotifyRoutes(app);
   await registerUploadRoutes(app);
   await registerDebugRoutes(app);
+  registerSlashRoutes(app);
   await registerPtyBridge(app);
   registerWallChannel(app);
 
