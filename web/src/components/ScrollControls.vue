@@ -3,20 +3,20 @@
     <div class="left">
       <button
         class="primary"
-        :class="{ active: inCopyMode }"
+        :class="{ active: props.inCopyMode }"
         @click="toggleHistory"
-        :title="inCopyMode ? 'Exit copy-mode' : 'Enter tmux copy-mode (history)'"
-      >📜 {{ inCopyMode ? 'exit' : 'history' }}</button>
+        :title="props.inCopyMode ? 'Exit copy-mode' : 'Enter tmux copy-mode (history)'"
+      >📜 {{ props.inCopyMode ? 'exit' : 'history' }}</button>
       <button class="repeat"
         @pointerdown.prevent="startRepeat('PageUp', $event)"
         @pointerup.prevent="stopRepeat" @pointerleave="stopRepeat" @pointercancel="stopRepeat"
         @contextmenu.prevent
-        :disabled="!inCopyMode" title="Page up">PgUp</button>
+        :disabled="!props.inCopyMode" title="Page up">PgUp</button>
       <button class="repeat"
         @pointerdown.prevent="startRepeat('PageDown', $event)"
         @pointerup.prevent="stopRepeat" @pointerleave="stopRepeat" @pointercancel="stopRepeat"
         @contextmenu.prevent
-        :disabled="!inCopyMode" title="Page down">PgDn</button>
+        :disabled="!props.inCopyMode" title="Page down">PgDn</button>
       <span class="sep"></span>
       <button class="accent" @click="reply('y\n')" title="Yes">Yes</button>
       <button class="accent" @click="reply('2\n')" title="Yes · all">Yes·all</button>
@@ -52,25 +52,17 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { onBeforeUnmount, watch } from 'vue';
 import { api } from '../api';
 
-const props = defineProps<{ session: string; windowId: string }>();
-
-// Tracks our intent. tmux's actual copy-mode state could drift (e.g. user
-// pressed q in the terminal directly, or auto-exited). The button is a
-// best-effort toggle; the underlying RPCs (copy-mode / send-keys q) are
-// idempotent so calling either redundantly is harmless.
-const inCopyMode = ref(false);
+const props = defineProps<{ session: string; windowId: string; inCopyMode: boolean }>();
 
 async function toggleHistory() {
   try {
-    if (inCopyMode.value) {
+    if (props.inCopyMode) {
       await api.sendKey(props.session, props.windowId, 'q');
-      inCopyMode.value = false;
     } else {
       await api.copyMode(props.session, props.windowId);
-      inCopyMode.value = true;
     }
   } catch (e: any) {
     alert(e.message);
@@ -111,7 +103,7 @@ function stopRepeat() {
 }
 
 // Reset when window changes
-watch(() => [props.session, props.windowId], () => { inCopyMode.value = false; stopRepeat(); });
+watch(() => [props.session, props.windowId], () => { stopRepeat(); });
 onBeforeUnmount(() => { stopRepeat(); });
 </script>
 
