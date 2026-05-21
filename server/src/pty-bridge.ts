@@ -2,6 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import websocketPlugin from '@fastify/websocket';
 import * as pty from 'node-pty';
 import { SlashMenuTracker } from './slash-tracker.js';
+import type { SlashMenuItem } from './slash-parser.js';
+
+const PROBE_WAIT_MS = 600;   // 等 Claude 渲染菜单的上限
+const PROBE_SETTLE_MS = 150; // Backspace 后等 Claude 重画"无菜单"的时间
 
 export async function registerPtyBridge(app: FastifyInstance) {
   await app.register(websocketPlugin);
@@ -35,13 +39,18 @@ export async function registerPtyBridge(app: FastifyInstance) {
     }
 
     let killFallback: NodeJS.Timeout | null = null;
+    let probing = false;
 
     const tracker = new SlashMenuTracker(frame => {
+      // probe 期间也不推 onChange 帧给前端(避免 slash-menu 中间帧抖动)
+      if (probing) return;
       try { conn.send(JSON.stringify(frame)); } catch { /* dead */ }
     });
 
     ptyProc.onData(data => {
-      try { conn.send(data, { binary: true }); } catch { /* dead */ }
+      if (!probing) {
+        try { conn.send(data, { binary: true }); } catch { /* dead */ }
+      }
       try { tracker.feed(data); } catch { /* parser fault must not poison binary path */ }
     });
     ptyProc.onExit(() => {
@@ -73,5 +82,53 @@ export async function registerPtyBridge(app: FastifyInstance) {
         try { ptyProc.kill('SIGKILL'); } catch { }
       }, 1000);
     });
+
+    // ----- Probe lifecycle -----
+
+    async function probeSlashMenu(): Promise<SlashMenuItem[]> {
+      probing = true;
+      try {
+        const items = await new Promise<SlashMenuItem[]>(resolve => {
+          let done = false;
+          const timer = setTimeout(() => {
+            if (done) return;
+            done = true;
+            tracker.cancelOnceMenu();
+            resolve([]);
+          }, PROBE_WAIT_MS);
+          tracker.onceMenu(menuItems => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            resolve(menuItems);
+          });
+          // 触发 Claude 弹菜单
+          try { ptyProc.write('/'); } catch { /* */ }
+        });
+        // 撤销 /
+        try { ptyProc.write('\x7f'); } catch { /* */ }
+        // 等 Claude 重画 "无菜单" 状态被 tracker 吃掉
+        await new Promise(r => setTimeout(r, PROBE_SETTLE_MS));
+        return items;
+      } finally {
+        probing = false;
+        tracker.reset(); // 清掉 probe 期间累积的 buffer, 避免污染后续正常 PTY 流
+      }
+    }
+
+    // 自动 prewarm:延迟一会儿等 selectWindow 完成 + tmux client attach 稳定。
+    setTimeout(async () => {
+      try {
+        const panes = await app.tmux.listPanes(session, id);
+        const active = panes.find(p => p.active);
+        if (active?.cmd !== 'claude') return;
+        const items = await probeSlashMenu();
+        try {
+          conn.send(JSON.stringify({ type: 'slash-menu-list', items }));
+        } catch { /* dead */ }
+      } catch {
+        // listPanes / probe 失败 → 不推 list,前端 cache 永远空,可接受
+      }
+    }, 200);
   });
 }

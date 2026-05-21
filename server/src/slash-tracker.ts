@@ -60,8 +60,10 @@ export class SlashMenuTracker {
     this.onceMenuCb = null;
   }
 
-  /** Reset internal buffer/state. Call after probe completes to avoid the
-   *  pre-probe screen lingering and causing spurious menu detection. */
+  /** Reset internal buffer/state. MUST only be called when downstream
+   *  onChange frames are being suppressed by the caller (e.g. during a
+   *  probe with probing=true); otherwise the consumer may be left with a
+   *  stale 'menu' view since reset does NOT emit slash-menu-close. */
   reset(): void {
     this.buf = '';
     this.last = { state: 'idle' };
