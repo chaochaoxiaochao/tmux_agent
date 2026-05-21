@@ -7,7 +7,7 @@ const execFileP = promisify(execFile);
 
 export interface WindowMeta { id: string; index: number; name: string; active: boolean; panes: number }
 export interface SessionMeta { name: string; attached: boolean; windowCount: number }
-export interface PaneMeta { id: string; index: number; active: boolean; size: string; cmd: string; path: string }
+export interface PaneMeta { id: string; index: number; active: boolean; size: string; cmd: string; path: string; inMode: boolean }
 
 export interface TmuxControlOpts {
   socket?: string;

@@ -35,20 +35,21 @@ export function copyMode(session: string, windowId: string): string[] {
   return ['copy-mode', '-t', `${session}:${windowId}`];
 }
 
-const PANE_FMT = '#{pane_id}|#{pane_index}|#{pane_active}|#{pane_width}x#{pane_height}|#{pane_current_command}|#{pane_current_path}';
+const PANE_FMT = '#{pane_id}|#{pane_index}|#{pane_active}|#{pane_width}x#{pane_height}|#{pane_current_command}|#{pane_current_path}|#{pane_in_mode}';
 
 export function listPanes(session: string, windowId: string): string[] {
   return ['list-panes', '-t', `${session}:${windowId}`, '-F', PANE_FMT];
 }
 
 export function parsePaneLine(line: string) {
-  const [id, index, active, size, cmd, path] = line.split('|');
+  const [id, index, active, size, cmd, path, inMode] = line.split('|');
   return {
     id, cmd: cmd ?? '',
     index: Number(index),
     active: active === '1',
     size: size ?? '',
     path: path ?? '',
+    inMode: inMode === '1',
   };
 }
 
