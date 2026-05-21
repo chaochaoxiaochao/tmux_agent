@@ -101,15 +101,11 @@ function connect() {
         recordFrame(data.byteLength);
         term?.write(new Uint8Array(data));
       } else {
-        // 文本帧:尝试解析 slash-menu-list JSON。失败的非 JSON 文本仍走 dbg。
+        // ReconnectingWS 在收到文本帧时已经 JSON.parse 过, 所以 data 是 object。
+        // 这里只需识别 type:'slash-menu-list' 帧。
         let frame: SlashMenuFrame | null = null;
-        if (typeof data === 'string') {
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed && parsed.type === 'slash-menu-list') {
-              frame = parsed as SlashMenuFrame;
-            }
-          } catch { /* not JSON */ }
+        if (data && typeof data === 'object' && (data as any).type === 'slash-menu-list') {
+          frame = data as SlashMenuFrame;
         }
         if (frame) {
           emit('slash-menu-list', { items: frame.items });
