@@ -262,7 +262,8 @@ watch(text, async (val, prev) => {
   const isSlashLed = val.startsWith('/');
 
   if (isSlashLed && !wasSlashLed) {
-    if (slashDecisionInFlight) return;
+    // 不再 early-return on slashDecisionInFlight;gen-token 已经保护过 late 写入。
+    // 旧的 in-flight 决策会看到 myGen != current 自行作废。
     const myGen = ++slashDecisionGen;
     slashDecisionInFlight = true;
     try {
@@ -303,6 +304,7 @@ let mirrorPending: string | null = null;
 async function flushMirror(target: string) {
   let cur = target;
   while (true) {
+    if (slashMode.value !== 'mirror') break; // 模式变了立即收手,别覆盖 mirrorSent
     const sent = mirrorSent.value;
     if (cur === sent) break; // 无需变化
 
@@ -416,7 +418,8 @@ function exitSlashMode() {
   completionTrigger.value = null;
   mirrorSent.value = '';
   mirrorPending = null;
-  mirrorBusy = false;
+  // 注意:不要在这里 mirrorBusy = false,让正在跑的 flushMirror 在 finally 自己关
+  // (Issue-A 的 mode-check 会让它本轮 break,finally 会把 mirrorBusy 清掉)
   text.value = ''; // 字符已透传给 PTY,留前端冗余
 }
 
