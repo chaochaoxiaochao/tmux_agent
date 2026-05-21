@@ -23,3 +23,18 @@ export interface UploadResult { path: string; mimeType: string; size: number }
 export interface SlashMenuItem { name: string; desc?: string }
 export type SlashMenuFrame =
   | { type: 'slash-menu-list'; items: SlashMenuItem[] };
+export interface PaneMetaItem {
+  id: string;
+  index: number;
+  active: boolean;
+  size: string;
+  cmd: string;
+  path: string;
+  inMode: boolean;
+}
+export interface PaneMetaFrame {
+  type: 'pane-meta';
+  session: string;
+  windowId: string;
+  panes: PaneMetaItem[];
+}
