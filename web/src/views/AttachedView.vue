@@ -23,16 +23,17 @@
         <span v-else>🐞 debug</span>
       </button>
     </header>
-    <PaneStrip :session="session" :window-id="id" />
+    <PaneStrip :session="session" :window-id="id" :panes="panes" />
     <div class="body">
       <div class="term-area"><XtermPane
         ref="xterm"
         :session="session"
         :window-id="id"
         @slash-menu-list="onSlashMenuList"
+        @pane-meta="onPaneMeta"
       /></div>
     </div>
-    <ScrollControls :session="session" :window-id="id" />
+    <ScrollControls :session="session" :window-id="id" :in-copy-mode="activePane?.inMode ?? false" />
     <AttachedComposer
       ref="composer"
       :session="session"
@@ -59,7 +60,7 @@ import ScrollControls from '../components/ScrollControls.vue';
 import AttachedComposer from '../components/AttachedComposer.vue';
 import PaneStrip from '../components/PaneStrip.vue';
 import { api } from '../api';
-import type { SlashMenuItem } from '../types';
+import type { SlashMenuItem, PaneMetaFrame, PaneMetaItem } from '../types';
 
 const props = defineProps<{ session: string; id: string }>();
 const pendingFiles = ref<File[]>([]);
@@ -75,6 +76,18 @@ const composer = ref<InstanceType<typeof AttachedComposer> | null>(null);
 function onSlashMenuList(payload: { items: SlashMenuItem[] }) {
   composer.value?.onSlashMenuList(payload);
 }
+
+const panes = ref<PaneMetaItem[]>([]);
+const activePane = computed(() => panes.value.find(p => p.active) ?? null);
+
+function onPaneMeta(payload: PaneMetaFrame) {
+  if (payload.session !== props.session || payload.windowId !== props.id) return;
+  panes.value = payload.panes;
+}
+
+// 切换 window 时清空，避免短暂显示上一个 window 的状态
+watch(() => [props.session, props.id], () => { panes.value = []; });
+
 const bugState = ref<'' | 'loading' | 'ok' | 'err'>('');
 const bugTitle = ref('dump diagnostics to server log');
 
