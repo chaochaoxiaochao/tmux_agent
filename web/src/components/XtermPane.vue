@@ -10,11 +10,12 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { ReconnectingWS } from '../ws';
-import type { SlashMenuFrame, SlashMenuItem } from '../types';
+import type { SlashMenuFrame, SlashMenuItem, PaneMetaFrame } from '../types';
 
 const props = defineProps<{ session: string; windowId: string }>();
 const emit = defineEmits<{
   (e: 'slash-menu-list', payload: { items: SlashMenuItem[] }): void;
+  (e: 'pane-meta', payload: PaneMetaFrame): void;
 }>();
 
 const root = ref<HTMLDivElement | null>(null);
@@ -102,13 +103,15 @@ function connect() {
         term?.write(new Uint8Array(data));
       } else {
         // ReconnectingWS 在收到文本帧时已经 JSON.parse 过, 所以 data 是 object。
-        // 这里只需识别 type:'slash-menu-list' 帧。
-        let frame: SlashMenuFrame | null = null;
-        if (data && typeof data === 'object' && (data as any).type === 'slash-menu-list') {
-          frame = data as SlashMenuFrame;
-        }
-        if (frame) {
-          emit('slash-menu-list', { items: frame.items });
+        if (data && typeof data === 'object') {
+          const t = (data as any).type;
+          if (t === 'slash-menu-list') {
+            emit('slash-menu-list', { items: (data as SlashMenuFrame).items });
+          } else if (t === 'pane-meta') {
+            emit('pane-meta', data as PaneMetaFrame);
+          } else {
+            dbg('rx non-binary frame:', typeof data, data);
+          }
         } else {
           dbg('rx non-binary frame:', typeof data, data);
         }
