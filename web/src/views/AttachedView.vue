@@ -10,6 +10,12 @@
       <button @click="$router.push('/')">← wall</button>
       <span class="bc">{{ session }} : {{ id }}</span>
       <span class="spacer"></span>
+      <button class="refresh-slash" :class="refreshState" @click="handleRefreshSlash" :disabled="refreshState === 'loading'" :title="refreshTitle">
+        <span v-if="refreshState === 'loading'">⏳</span>
+        <span v-else-if="refreshState === 'ok'">✓</span>
+        <span v-else-if="refreshState === 'err'">✗</span>
+        <span v-else>🔄</span>
+      </button>
       <button class="bug" :class="bugState" @click="dumpDiag" :disabled="bugState === 'loading'" :title="bugTitle">
         <span v-if="bugState === 'loading'">⏳ saving…</span>
         <span v-else-if="bugState === 'ok'">✓ saved</span>
@@ -71,6 +77,28 @@ function onSlashMenuList(payload: { items: SlashMenuItem[] }) {
 }
 const bugState = ref<'' | 'loading' | 'ok' | 'err'>('');
 const bugTitle = ref('dump diagnostics to server log');
+
+const refreshState = ref<'' | 'loading' | 'ok' | 'err'>('');
+const refreshTitle = ref('refresh slash menu list');
+
+async function handleRefreshSlash() {
+  if (refreshState.value === 'loading') return;
+  refreshState.value = 'loading';
+  refreshTitle.value = 'refreshing…';
+  try {
+    const r = await api.slashRefresh(props.session, props.id);
+    composer.value?.onSlashMenuList({ items: r.items });
+    refreshState.value = 'ok';
+    refreshTitle.value = `refreshed: ${r.items.length} items`;
+  } catch (e: any) {
+    refreshState.value = 'err';
+    refreshTitle.value = `failed: ${e?.message ?? e}`;
+  }
+  setTimeout(() => {
+    refreshState.value = '';
+    refreshTitle.value = 'refresh slash menu list';
+  }, 2500);
+}
 
 async function dumpDiag() {
   // Guard against double-click while a request is in flight.
@@ -203,6 +231,21 @@ watch(() => [props.session, props.id], onEnter);
 .bar .bug.loading { background: var(--ink-faint); color: var(--ink); border-color: var(--ink-dim); }
 .bar .bug.ok  { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
 .bar .bug.err { background: var(--err);    color: #fff; border-color: var(--err);    font-weight: 700; }
+.bar .refresh-slash {
+  font-size: 13px; padding: 4px 10px;
+  min-width: 44px;
+  background: transparent; border: 1px solid var(--ink-faint); color: var(--ink-dim);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  margin-right: 6px;
+}
+.bar .refresh-slash:hover  { color: var(--ink); border-color: var(--ink-dim); }
+.bar .refresh-slash:active { background: rgba(255, 255, 255, 0.1); }
+.bar .refresh-slash:disabled { cursor: wait; }
+.bar .refresh-slash.loading { background: var(--ink-faint); color: var(--ink); border-color: var(--ink-dim); }
+.bar .refresh-slash.ok  { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+.bar .refresh-slash.err { background: var(--err);    color: #fff; border-color: var(--err);    font-weight: 700; }
 .body { display: flex; flex: 1; min-height: 0; }
 .term-area { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 
