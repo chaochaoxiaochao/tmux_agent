@@ -1,5 +1,5 @@
 <template>
-  <div class="composer">
+  <div ref="wrapEl" class="composer">
     <div class="picker-anchor">
       <MentionPicker
         :items="completionItems"
@@ -41,6 +41,7 @@
         @keydown="onKeydown"
         @input="autoGrow"
         @paste="onPaste"
+        @focus="onInputFocus"
       ></textarea>
       <button
         class="btn send"
@@ -52,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { api } from '../api';
 import MentionPicker from './MentionPicker.vue';
 import type { CompletionItem } from '../types';
@@ -66,6 +67,7 @@ const emit = defineEmits<{ (e: 'pending-consumed'): void }>();
 
 const text = ref('');
 const inputEl = ref<HTMLTextAreaElement | null>(null);
+const wrapEl = ref<HTMLDivElement | null>(null);
 
 const placeholder = 'type or paste...';
 
@@ -187,10 +189,36 @@ const canSend = computed(() => {
 
 // 触屏不 autofocus,桌面 autofocus(用户进 attached view 想直接打字)
 const isTouchDevice = typeof window !== 'undefined' && 'ontouchstart' in window;
+
+function ensureComposerVisible() {
+  if (!wrapEl.value) return;
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      wrapEl.value?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    }, 50);
+  });
+}
+
+function onInputFocus() {
+  ensureComposerVisible();
+  setTimeout(ensureComposerVisible, 350); // 键盘动画完成后再校一次
+}
+
+const onViewportResize = () => {
+  if (document.activeElement === inputEl.value) ensureComposerVisible();
+};
+
 onMounted(() => {
   if (!isTouchDevice) {
     nextTick(() => inputEl.value?.focus());
   }
+  const vv = (window as any).visualViewport as VisualViewport | undefined;
+  vv?.addEventListener('resize', onViewportResize);
+});
+
+onUnmounted(() => {
+  const vv = (window as any).visualViewport as VisualViewport | undefined;
+  vv?.removeEventListener('resize', onViewportResize);
 });
 
 function autoGrow() {
