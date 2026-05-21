@@ -7,7 +7,31 @@
         @pick="pickCompletion"
       />
     </div>
+    <div v-if="attachments.length" class="chips">
+      <div
+        v-for="a in attachments"
+        :key="a.id"
+        class="chip"
+        :class="{ err: a.status === 'error' }"
+      >
+        <img v-if="a.previewUrl" :src="a.previewUrl" class="thumb" alt="" />
+        <span v-else class="thumb fallback">{{ fileIcon(a.mimeType) }}</span>
+        <span class="name" :title="a.name">{{ a.name }}</span>
+        <span v-if="a.status === 'uploading'" class="spinner" />
+        <span v-else-if="a.status === 'error'" class="err-text">failed</span>
+        <button class="rm" @click="removeAttachment(a.id)" aria-label="remove">✕</button>
+      </div>
+    </div>
     <div class="inputrow">
+      <button class="btn clip" @click="openPicker" aria-label="attach">📎</button>
+      <input
+        ref="fileInput"
+        type="file"
+        multiple
+        accept="image/*,application/pdf,text/*"
+        @change="onFilesPicked"
+        style="display:none"
+      />
       <textarea
         ref="inputEl"
         v-model="text"
@@ -16,6 +40,7 @@
         class="input"
         @keydown="onKeydown"
         @input="autoGrow"
+        @paste="onPaste"
       ></textarea>
       <button
         class="btn send"
@@ -35,13 +60,130 @@ import type { CompletionItem } from '../types';
 const props = defineProps<{
   session: string;
   windowId: string;
+  pendingFiles?: File[];
 }>();
+const emit = defineEmits<{ (e: 'pending-consumed'): void }>();
 
 const text = ref('');
 const inputEl = ref<HTMLTextAreaElement | null>(null);
 
 const placeholder = 'type or paste...';
-const canSend = computed(() => text.value.length > 0);
+
+interface Attachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  status: 'uploading' | 'ready' | 'error';
+  path?: string;
+  previewUrl?: string;
+}
+
+const attachments = ref<Attachment[]>([]);
+const fileInput = ref<HTMLInputElement | null>(null);
+const PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = r.result as string;
+      const idx = s.indexOf(',');
+      res(idx >= 0 ? s.slice(idx + 1) : s);
+    };
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+}
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as string);
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+}
+function fileIcon(mime: string): string {
+  if (mime.startsWith('image/')) return '🖼';
+  if (mime.startsWith('video/')) return '🎬';
+  if (mime.startsWith('audio/')) return '🎵';
+  if (mime === 'application/pdf') return '📄';
+  if (mime.startsWith('text/')) return '📝';
+  return '📎';
+}
+
+async function uploadOne(file: File) {
+  const id = Math.random().toString(36).slice(2);
+  const att: Attachment = {
+    id,
+    name: file.name || 'pasted',
+    mimeType: file.type || 'application/octet-stream',
+    status: 'uploading',
+  };
+  if (file.type.startsWith('image/') && file.size <= PREVIEW_MAX_BYTES) {
+    try { att.previewUrl = await fileToDataUrl(file); } catch { /* optional */ }
+  }
+  attachments.value.push(att);
+
+  try {
+    const b64 = await fileToBase64(file);
+    const r = await api.upload(props.session, props.windowId, att.name, att.mimeType, b64);
+    const cur = attachments.value.find(a => a.id === id);
+    if (!cur) {
+      api.deleteUpload(r.path).catch(() => undefined);
+      return;
+    }
+    cur.path = r.path;
+    cur.status = 'ready';
+  } catch {
+    const cur = attachments.value.find(a => a.id === id);
+    if (cur) cur.status = 'error';
+  }
+}
+
+function removeAttachment(id: string) {
+  const idx = attachments.value.findIndex(a => a.id === id);
+  if (idx < 0) return;
+  const [removed] = attachments.value.splice(idx, 1);
+  if (removed.path) api.deleteUpload(removed.path).catch(() => undefined);
+}
+
+function openPicker() { fileInput.value?.click(); }
+
+async function onFilesPicked(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const files = input.files ? Array.from(input.files) : [];
+  input.value = '';
+  for (const f of files) void uploadOne(f);
+}
+
+function onPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  const imgs: File[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (it.kind === 'file') {
+      const f = it.getAsFile();
+      if (f) imgs.push(f);
+    }
+  }
+  if (imgs.length) {
+    e.preventDefault();
+    for (const f of imgs) void uploadOne(f);
+  }
+}
+
+// 父组件 pendingFiles 变更 → 立刻上传 + emit pending-consumed
+watch(() => props.pendingFiles, (files) => {
+  if (!files || files.length === 0) return;
+  for (const f of files) void uploadOne(f);
+  emit('pending-consumed');
+}, { immediate: true });
+
+const canSend = computed(() => {
+  if (!text.value && attachments.value.length === 0) return false;
+  return attachments.value.every(a => a.status === 'ready');
+});
 
 // 触屏不 autofocus,桌面 autofocus(用户进 attached view 想直接打字)
 const isTouchDevice = typeof window !== 'undefined' && 'ontouchstart' in window;
@@ -121,14 +263,21 @@ function pickCompletion(it: CompletionItem) {
 
 async function send() {
   if (!canSend.value) return;
-  const body = text.value + '\n';
+  const refs = attachments.value
+    .filter(a => a.status === 'ready' && a.path)
+    .map(a => `@${a.path}`)
+    .join(' ');
+  const body = refs
+    ? (text.value ? `${refs} ${text.value}` : refs)
+    : text.value;
   try {
-    await api.send(props.session, props.windowId, body);
+    await api.send(props.session, props.windowId, body + '\n');
   } catch (e: any) {
     alert(e?.message ?? 'send failed');
-    return; // 失败保留 text,让用户重试
+    return;
   }
   text.value = '';
+  attachments.value = []; // server 已接收,文件由 Claude 读;不在前端 delete
   // 主动 blur:手机软键盘收起
   inputEl.value?.blur();
   nextTick(autoGrow); // 重置高度
@@ -218,4 +367,49 @@ function onKeydown(ev: KeyboardEvent) {
   color: var(--accent); border-color: var(--accent); font-weight: 600;
   font-size: 15px;
 }
+.chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 6px 8px 0;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 6px 4px 4px;
+  background: var(--bg);
+  border: 1px solid var(--ink-faint);
+  border-radius: 8px;
+  font: 12px ui-monospace, monospace;
+  color: var(--ink);
+  max-width: 240px;
+}
+.chip.err { border-color: var(--err); }
+.chip.err .name { text-decoration: line-through; color: var(--err); }
+.thumb {
+  width: 24px; height: 24px; border-radius: 4px;
+  object-fit: cover; background: var(--bg-alt);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex: 0 0 24px;
+}
+.thumb.fallback { color: var(--ink-dim); }
+.name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 140px;
+}
+.err-text { color: var(--err); font-size: 11px; }
+.spinner {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid var(--ink-faint);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.rm {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0; border-radius: 4px;
+  font-size: 11px; line-height: 1;
+  background: transparent; color: var(--ink-dim);
+  border: none; cursor: pointer;
+}
+.rm:hover { color: var(--ink); background: var(--bg-alt); }
+.btn.clip { font-size: 16px; padding: 0 10px; min-width: auto; }
 </style>

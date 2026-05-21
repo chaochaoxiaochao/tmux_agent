@@ -22,7 +22,12 @@
       <div class="term-area"><XtermPane ref="xterm" :session="session" :window-id="id" /></div>
     </div>
     <ScrollControls :session="session" :window-id="id" />
-    <AttachedComposer :session="session" :window-id="id" />
+    <AttachedComposer
+      :session="session"
+      :window-id="id"
+      :pending-files="pendingFiles"
+      @pending-consumed="pendingFiles = []"
+    />
     <InputDialog
       v-model:open="dialogOpen"
       :session="session"
@@ -96,9 +101,7 @@ async function dumpDiag() {
   setTimeout(() => { bugState.value = ''; }, 2500);
 }
 
-const dropHintText = computed(() =>
-  dialogOpen.value ? 'drop to attach' : 'drop to paste @path into terminal',
-);
+const dropHintText = computed(() => 'drop to attach');
 
 // dragenter/dragleave fire for every child, so we count depth to keep the
 // overlay visible until the drag truly leaves the page.
@@ -120,51 +123,7 @@ async function onDrop(e: DragEvent) {
   dragActive.value = false;
   const files = e.dataTransfer?.files;
   if (!files || !files.length) return;
-  const arr = Array.from(files);
-
-  // If the InputDialog is open, route files into its chip strip so the user
-  // can write a message and send. Otherwise (desktop default — user is
-  // typing in the xterm), upload silently and inject `@<path> ` into the
-  // pane so they can keep typing the prompt right after.
-  if (dialogOpen.value) {
-    pendingFiles.value = arr;
-    return;
-  }
-
-  for (const f of arr) {
-    void injectAttachment(f);
-  }
-}
-
-async function injectAttachment(file: File) {
-  try {
-    const b64 = await fileToBase64(file);
-    const r = await api.upload(
-      props.session,
-      props.id,
-      file.name || 'pasted',
-      file.type || 'application/octet-stream',
-      b64,
-    );
-    // Trailing space so the user can keep typing without sticking to the
-    // path. No newline — user submits the prompt themselves.
-    await api.send(props.session, props.id, `@${r.path} `);
-  } catch (e: any) {
-    alert(`upload failed: ${e.message ?? e}`);
-  }
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => {
-      const s = r.result as string;
-      const idx = s.indexOf(',');
-      res(idx >= 0 ? s.slice(idx + 1) : s);
-    };
-    r.onerror = () => rej(r.error);
-    r.readAsDataURL(file);
-  });
+  pendingFiles.value = Array.from(files);
 }
 function hasFiles(e: DragEvent): boolean {
   // dataTransfer.types includes 'Files' when OS files are being dragged.
