@@ -23,8 +23,7 @@
         ref="xterm"
         :session="session"
         :window-id="id"
-        @slash-menu="onSlashMenu"
-        @slash-menu-close="onSlashMenuClose"
+        @slash-menu-list="onSlashMenuList"
       /></div>
     </div>
     <ScrollControls :session="session" :window-id="id" />
@@ -63,18 +62,14 @@ let dragDepth = 0;
 
 // XtermPane ref so the 🐞 button can pull its diagnostic ring buffer.
 const xterm = ref<InstanceType<typeof XtermPane> | null>(null);
-// AttachedComposer ref so we can forward XtermPane's slash-menu events into
-// the composer's slash-mirror state machine (methods exposed in Task 6).
+// AttachedComposer ref so we can forward XtermPane's slash-menu-list event
+// into the composer's slash-mirror cache (method exposed in Task 6).
 const composer = ref<InstanceType<typeof AttachedComposer> | null>(null);
 
-function onSlashMenu(payload: { items: SlashMenuItem[]; active: number }) {
-  // Cast: AttachedComposer will defineExpose these methods in Task 6. Until
-  // then the type doesn't know about them, but optional chaining at runtime
-  // keeps this safe.
-  (composer.value as any)?.onSlashMenu?.(payload);
-}
-function onSlashMenuClose() {
-  (composer.value as any)?.onSlashMenuClose?.();
+function onSlashMenuList(payload: { items: SlashMenuItem[] }) {
+  // Cast: AttachedComposer will defineExpose onSlashMenuList in Task 6. Until
+  // then the type doesn't know about it; optional chaining keeps runtime safe.
+  (composer.value as any)?.onSlashMenuList?.(payload);
 }
 const bugState = ref<'' | 'loading' | 'ok' | 'err'>('');
 const bugTitle = ref('dump diagnostics to server log');

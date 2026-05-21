@@ -23,4 +23,5 @@ export interface UploadResult { path: string; mimeType: string; size: number }
 export interface SlashMenuItem { name: string; desc?: string }
 export type SlashMenuFrame =
   | { type: 'slash-menu'; items: SlashMenuItem[]; active: number }
-  | { type: 'slash-menu-close' };
+  | { type: 'slash-menu-close' }
+  | { type: 'slash-menu-list'; items: SlashMenuItem[] };

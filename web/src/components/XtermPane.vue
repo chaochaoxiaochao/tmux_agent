@@ -16,6 +16,7 @@ const props = defineProps<{ session: string; windowId: string }>();
 const emit = defineEmits<{
   (e: 'slash-menu', payload: { items: SlashMenuItem[]; active: number }): void;
   (e: 'slash-menu-close'): void;
+  (e: 'slash-menu-list', payload: { items: SlashMenuItem[] }): void;
 }>();
 
 const root = ref<HTMLDivElement | null>(null);
@@ -107,7 +108,11 @@ function connect() {
         if (typeof data === 'string') {
           try {
             const parsed = JSON.parse(data);
-            if (parsed && (parsed.type === 'slash-menu' || parsed.type === 'slash-menu-close')) {
+            if (parsed && (
+              parsed.type === 'slash-menu' ||
+              parsed.type === 'slash-menu-close' ||
+              parsed.type === 'slash-menu-list'
+            )) {
               frame = parsed as SlashMenuFrame;
             }
           } catch { /* not JSON */ }
@@ -115,8 +120,11 @@ function connect() {
         if (frame) {
           if (frame.type === 'slash-menu') {
             emit('slash-menu', { items: frame.items, active: frame.active });
-          } else {
+          } else if (frame.type === 'slash-menu-close') {
             emit('slash-menu-close');
+          } else {
+            // 'slash-menu-list'
+            emit('slash-menu-list', { items: frame.items });
           }
         } else {
           dbg('rx non-binary frame:', typeof data, data);
