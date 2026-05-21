@@ -22,16 +22,9 @@ export function registerCompletionRoutes(app: FastifyInstance) {
     return filterAndRank(files, q).map(f => ({ kind: 'file', path: f.path, mtime: f.mtime }));
   });
 
-  app.get<{ Querystring: { q?: string } }>('/api/commands', async (req) => {
-    const q = (req.query.q ?? '').toLowerCase();
-    const list = app.cfg.commands.filter(c => c.name.toLowerCase().includes(q));
-    return list.map(c => ({ kind: 'command', name: c.name, hint: c.hint, payload: c.payload }));
-  });
-
   app.get('/api/config', async () => ({
     accent: app.cfg.ui.accent,
     density: app.cfg.ui.density,
-    commands: app.cfg.commands,
     cwdFallback: app.cfg.tmux.cwdFallback,
     publicUrl: app.cfg.server.publicUrl ?? null,
   }));

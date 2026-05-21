@@ -61,7 +61,5 @@ export const api = {
 
   // completion + config
   files: (q: string) => http<FileItem[]>('GET', `/api/files?q=${enc(q)}`),
-  commands: (q: string) =>
-    http<{ kind: 'command'; name: string; hint: string; payload: string }[]>('GET', `/api/commands?q=${enc(q)}`),
   config: () => http<UiConfig>('GET', '/api/config'),
 };

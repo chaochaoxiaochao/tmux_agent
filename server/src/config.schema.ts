@@ -3,13 +3,11 @@ export interface Config {
   tmux: { session: string; cwdFallback: string };
   ui: { accent: 'green' | 'blue' | 'amber'; density: 'comfortable' | 'compact' };
   buttons: Button[];
-  commands: Command[];
   statusRules: StatusRule[];
   log: { level: 'debug' | 'info' | 'warn' | 'error'; file: string };
 }
 
 export interface Button { id: string; label: string; payload: string }
-export interface Command { name: string; hint: string; payload: string }
 export interface StatusRule { match: string; status: 'ok' | 'warn' | 'err' }
 
 export const DEFAULT_CONFIG: Config = {
@@ -20,17 +18,12 @@ export const DEFAULT_CONFIG: Config = {
     { id: 'btn-yes', label: 'Yes', payload: 'y\n' },
     { id: 'btn-no', label: 'No', payload: 'n\n' },
     { id: 'btn-yes-all', label: 'Yes·all', payload: '2\n' },
-    { id: 'btn-esc', label: 'Esc', payload: '\u001b' },
-    { id: 'btn-ctrl-c', label: 'Ctrl+C', payload: '\u0003' },
-  ],
-  commands: [
-    { name: 'commit', hint: 'git commit -m', payload: 'git commit -m "' },
-    { name: 'clear', hint: 'clear screen', payload: 'clear\n' },
+    { id: 'btn-esc', label: 'Esc', payload: '' },
+    { id: 'btn-ctrl-c', label: 'Ctrl+C', payload: '' },
   ],
   // Empty by default. Wall tile color falls back to running/idle
   // (lastOutputAgeMs < 5s = green, else gray). External hooks
   // (POST /api/notify) drive the WAIT/DONE pulse.
-  // Add your own here if you want extra rule-based highlighting.
   statusRules: [],
   log: { level: 'info', file: '~/.local/share/tmux-agent/server.log' },
 };
@@ -41,7 +34,6 @@ export function mergeConfig(partial: Partial<Config>): Config {
     tmux: { ...DEFAULT_CONFIG.tmux, ...(partial.tmux ?? {}) },
     ui: { ...DEFAULT_CONFIG.ui, ...(partial.ui ?? {}) },
     buttons: partial.buttons ?? DEFAULT_CONFIG.buttons,
-    commands: partial.commands ?? DEFAULT_CONFIG.commands,
     statusRules: partial.statusRules ?? DEFAULT_CONFIG.statusRules,
     log: { ...DEFAULT_CONFIG.log, ...(partial.log ?? {}) },
   };

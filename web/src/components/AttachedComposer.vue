@@ -261,7 +261,7 @@ watch(text, async () => {
   try {
     const items: CompletionItem[] = trig.char === '@'
       ? await api.files(trig.suffix)
-      : await api.commands(trig.suffix);
+      : []; // '/' 分支由 Task 6 用 prewarm cache 接上 — 过渡态返回空
     // 防止旧请求晚到覆盖新结果
     if (token !== completionToken.value) return;
     completionItems.value = items;
