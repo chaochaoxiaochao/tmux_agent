@@ -6,6 +6,7 @@ export class PaneMetaPusher {
   private timer: NodeJS.Timeout | null = null;
   private lastSerialized: string | null = null;
   private disposed = false;
+  private pushing = false;
 
   constructor(
     private tmux: TmuxControl,
@@ -20,11 +21,16 @@ export class PaneMetaPusher {
   }
 
   async pushNow(reason: string): Promise<void> {
-    if (this.disposed) return;
-    if (this.timer) { clearInterval(this.timer); this.timer = null; }
-    await this.pollAndPush(reason);
-    if (!this.disposed) {
-      this.timer = setInterval(() => void this.pollAndPush('poll'), POLL_INTERVAL_MS);
+    if (this.disposed || this.pushing) return;
+    this.pushing = true;
+    try {
+      if (this.timer) { clearInterval(this.timer); this.timer = null; }
+      await this.pollAndPush(reason);
+      if (!this.disposed) {
+        this.timer = setInterval(() => void this.pollAndPush('poll'), POLL_INTERVAL_MS);
+      }
+    } finally {
+      this.pushing = false;
     }
   }
 
@@ -41,6 +47,7 @@ export class PaneMetaPusher {
     } catch {
       return;
     }
+    if (this.disposed) return;
     const frame = {
       type: 'pane-meta' as const,
       session: this.session,
