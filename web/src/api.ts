@@ -34,7 +34,7 @@ export const api = {
   copyMode: (session: string, id: string) =>
     http<void>('POST', `${wbase(session)}/${enc(id)}/copy-mode`),
   panes: (session: string, id: string) =>
-    http<{ id: string; index: number; active: boolean; size: string; cmd: string; path: string }[]>(
+    http<{ id: string; index: number; active: boolean; size: string; cmd: string; path: string; inMode: boolean }[]>(
       'GET', `${wbase(session)}/${enc(id)}/panes`),
   selectPane: (session: string, id: string, pane: string) =>
     http<void>('POST', `${wbase(session)}/${enc(id)}/panes/${enc(pane)}/select`),

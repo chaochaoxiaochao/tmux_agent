@@ -16,10 +16,15 @@ export class PaneMetaPusher {
   ) {}
 
   start(): void {
-    void this.pollAndPush('bootstrap');
-    this.timer = setInterval(() => void this.pollAndPush('poll'), POLL_INTERVAL_MS);
+    // Route bootstrap through pushNow so it shares the `pushing` mutex with
+    // event-triggered pushes — otherwise a REST handler firing pushNow during
+    // the bootstrap listPanes await would race two pollAndPush calls.
+    void this.pushNow('bootstrap');
   }
 
+  // If `pushing` is true, the in-flight pollAndPush will see the latest tmux
+  // state when it next polls — dropping this frame is intentional. The 2s
+  // poll interval bounds worst-case staleness.
   async pushNow(reason: string): Promise<void> {
     if (this.disposed || this.pushing) return;
     this.pushing = true;
