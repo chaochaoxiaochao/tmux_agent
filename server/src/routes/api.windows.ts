@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { pushNow as pushPaneMeta } from '../pane-meta-registry.js';
 
 const MAX_SEND_BYTES = 16 * 1024;
 
@@ -91,6 +92,7 @@ export async function registerWindowsRoutes(app: FastifyInstance) {
       const { session, id, pane } = req.params;
       try { await app.tmux.selectPane(session, id, pane); }
       catch (e: any) { reply.status(502).send({ error: 'select_failed', message: e.message }); return; }
+      pushPaneMeta(session, id, 'select');
       reply.status(204).send();
     },
   );
@@ -102,6 +104,7 @@ export async function registerWindowsRoutes(app: FastifyInstance) {
       const { session, id, pane } = req.params;
       try { await app.tmux.toggleZoom(session, id, pane); }
       catch (e: any) { reply.status(502).send({ error: 'zoom_failed', message: e.message }); return; }
+      pushPaneMeta(session, id, 'zoom');
       reply.status(204).send();
     },
   );
@@ -115,6 +118,7 @@ export async function registerWindowsRoutes(app: FastifyInstance) {
       const { session, id } = req.params;
       try { await app.tmux.ensureZoomedOnActive(session, id); }
       catch (e: any) { reply.status(502).send({ error: 'zoom_failed', message: e.message }); return; }
+      pushPaneMeta(session, id, 'ensure-zoom');
       reply.status(204).send();
     },
   );
@@ -132,6 +136,7 @@ export async function registerWindowsRoutes(app: FastifyInstance) {
       }
       try { await app.tmux.copyMode(session, id); }
       catch (e: any) { reply.status(502).send({ error: 'copy_mode_failed', message: e.message }); return; }
+      pushPaneMeta(session, id, 'copy-mode');
       reply.status(204).send();
     },
   );
@@ -155,6 +160,7 @@ export async function registerWindowsRoutes(app: FastifyInstance) {
       }
       try { await app.tmux.sendKey(session, id, key); }
       catch (e: any) { reply.status(502).send({ error: 'send_failed', message: e.message }); return; }
+      pushPaneMeta(session, id, 'key');
       reply.status(204).send();
     },
   );
