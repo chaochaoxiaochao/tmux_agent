@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import websocketPlugin from '@fastify/websocket';
 import * as pty from 'node-pty';
+import { SlashMenuTracker } from './slash-tracker.js';
 
 export async function registerPtyBridge(app: FastifyInstance) {
   await app.register(websocketPlugin);
@@ -35,8 +36,13 @@ export async function registerPtyBridge(app: FastifyInstance) {
 
     let killFallback: NodeJS.Timeout | null = null;
 
+    const tracker = new SlashMenuTracker(frame => {
+      try { conn.send(JSON.stringify(frame)); } catch { /* dead */ }
+    });
+
     ptyProc.onData(data => {
       try { conn.send(data, { binary: true }); } catch { /* dead */ }
+      try { tracker.feed(data); } catch { /* parser fault must not poison binary path */ }
     });
     ptyProc.onExit(() => {
       if (killFallback) { clearTimeout(killFallback); killFallback = null; }

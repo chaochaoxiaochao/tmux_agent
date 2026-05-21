@@ -1,4 +1,4 @@
-import { parseSlashMenu, type SlashParseResult, type SlashMenuItem } from './slash-parser';
+import { parseSlashMenu, type SlashParseResult, type SlashMenuItem } from './slash-parser.js';
 
 export type SlashMenuFrame =
   | { type: 'slash-menu'; items: SlashMenuItem[]; active: number }
