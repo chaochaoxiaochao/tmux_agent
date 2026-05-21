@@ -56,7 +56,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { api } from '../api';
 import MentionPicker from './MentionPicker.vue';
-import type { CompletionItem, SlashMenuItem } from '../types';
+import type { CompletionItem } from '../types';
 
 const props = defineProps<{
   session: string;
@@ -236,9 +236,6 @@ const completionItems = ref<CompletionItem[]>([]);
 const completionActive = ref(0);
 const completionTrigger = ref<'/' | '@' | null>(null);
 
-const slashMode = ref<'off' | 'mirror' | 'local'>('off');
-const mirrorSent = ref('');
-
 function detectTrigger(): { char: '/' | '@'; suffix: string } | null {
   const v = text.value;
   for (let i = v.length - 1; i >= 0; i--) {
@@ -252,67 +249,7 @@ function detectTrigger(): { char: '/' | '@'; suffix: string } | null {
 // per-instance token (script setup top-level let 实际是模块级共享 —— Vue 3 SFC 坑;
 // 多实例同页会互相吞掉补全请求。包成 ref 让每个 instance 独立。)
 const completionToken = ref(0);
-
-// 6.2 当 text 首字符从非 / 切到 /,决定 mirror / local 模式
-let slashDecisionInFlight = false;
-watch(text, async (val, prev) => {
-  const wasSlashLed = !!prev && prev.startsWith('/');
-  const isSlashLed = val.startsWith('/');
-  if (isSlashLed && !wasSlashLed) {
-    if (slashDecisionInFlight) return;
-    slashDecisionInFlight = true;
-    try {
-      const panes = await api.panes(props.session, props.windowId);
-      const active = panes.find(p => p.active);
-      if (active?.cmd === 'claude') {
-        slashMode.value = 'mirror';
-        try { await api.send(props.session, props.windowId, '/'); } catch { /* best effort */ }
-        // 同步:防止 6.3 watcher 看到当前 val='/' 再发一次
-        mirrorSent.value = val;
-      } else {
-        slashMode.value = 'local';
-      }
-    } catch {
-      slashMode.value = 'local';
-    } finally {
-      slashDecisionInFlight = false;
-    }
-  }
-  if (!isSlashLed && wasSlashLed) {
-    exitSlashMode();
-  }
-});
-
-// 6.3 mirror 态下,把用户在 textarea 的输入增量透传到 PTY
-watch(text, async (val) => {
-  if (slashMode.value !== 'mirror') {
-    mirrorSent.value = '';
-    return;
-  }
-  if (val.startsWith(mirrorSent.value) && val.length > mirrorSent.value.length) {
-    // 用户在末尾追加字符
-    const delta = val.slice(mirrorSent.value.length);
-    try { await api.send(props.session, props.windowId, delta); } catch { /* best effort */ }
-    mirrorSent.value = val;
-  } else if (val.length < mirrorSent.value.length && mirrorSent.value.startsWith(val)) {
-    // 用户在末尾删字符
-    const removed = mirrorSent.value.length - val.length;
-    try {
-      for (let i = 0; i < removed; i++) await api.send(props.session, props.windowId, '\x7f');
-    } catch { /* best effort */ }
-    mirrorSent.value = val;
-  } else if (val !== mirrorSent.value) {
-    // 中间编辑/不一致:全量退格 + 重发
-    try {
-      for (let i = 0; i < mirrorSent.value.length; i++) await api.send(props.session, props.windowId, '\x7f');
-      if (val) await api.send(props.session, props.windowId, val);
-    } catch { /* best effort */ }
-    mirrorSent.value = val;
-  }
-});
-
 watch(text, async () => {
-  if (slashMode.value === 'mirror') return; // mirror 态走自己的 6.4 帧驱动
   const trig = detectTrigger();
   if (!trig) {
     completionItems.value = [];
@@ -352,31 +289,6 @@ function pickCompletion(it: CompletionItem) {
   nextTick(() => inputEl.value?.focus());
 }
 
-function onSlashMenu(payload: { items: SlashMenuItem[]; active: number }) {
-  if (slashMode.value !== 'mirror') return;
-  completionItems.value = payload.items.map(it => ({
-    kind: 'command' as const,
-    name: it.name,
-    hint: it.desc ?? '',
-    payload: '/' + it.name,
-  }));
-  completionActive.value = payload.active;
-  completionTrigger.value = '/';
-}
-function onSlashMenuClose() {
-  if (slashMode.value !== 'mirror') return;
-  exitSlashMode();
-}
-function exitSlashMode() {
-  slashMode.value = 'off';
-  completionItems.value = [];
-  completionTrigger.value = null;
-  mirrorSent.value = '';
-  text.value = ''; // 字符已透传给 PTY,留前端冗余
-}
-
-defineExpose({ onSlashMenu, onSlashMenuClose });
-
 async function send() {
   if (!canSend.value) return;
   const refs = attachments.value
@@ -400,24 +312,6 @@ async function send() {
 }
 
 function onKeydown(ev: KeyboardEvent) {
-  // mirror 态:↑/↓/Enter/Esc 转发给 PTY,本地不处理 completion 选择
-  if (slashMode.value === 'mirror') {
-    const map: Record<string, string> = {
-      ArrowDown: 'Down',
-      ArrowUp: 'Up',
-      Enter: 'Enter',
-      Escape: 'Escape',
-    };
-    const k = map[ev.key];
-    if (k) {
-      ev.preventDefault();
-      api.sendKey(props.session, props.windowId, k).catch(() => undefined);
-      // Enter/Esc 之后 PTY 那边会关菜单,server 推 slash-menu-close 帧来触发 exitSlashMode
-      return;
-    }
-    // 其他键:让 textarea 原生处理 + 6.3 watcher 透传
-    return;
-  }
   // 补全菜单展开时,方向键 / Enter / Esc 给菜单用
   if (completionItems.value.length) {
     if (ev.key === 'ArrowDown') {
