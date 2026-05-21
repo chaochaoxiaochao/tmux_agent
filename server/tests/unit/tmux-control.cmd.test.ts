@@ -50,3 +50,15 @@ describe('tmux argv builders', () => {
       .toEqual(['display-message', '-p', '-t', 'main:@7', '#{pane_current_path}']);
   });
 });
+
+describe('parsePaneLine path field', () => {
+  it('parses pane_current_path as last column', () => {
+    const r = cmd.parsePaneLine('%5|0|1|97x17|claude|/home/foo/proj');
+    expect(r.path).toBe('/home/foo/proj');
+    expect(r.cmd).toBe('claude');
+  });
+  it('falls back to empty string when path missing', () => {
+    const r = cmd.parsePaneLine('%5|0|1|97x17|claude');
+    expect(r.path).toBe('');
+  });
+});
