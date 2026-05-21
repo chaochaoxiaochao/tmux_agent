@@ -10,8 +10,13 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { ReconnectingWS } from '../ws';
+import type { SlashMenuFrame, SlashMenuItem } from '../types';
 
 const props = defineProps<{ session: string; windowId: string }>();
+const emit = defineEmits<{
+  (e: 'slash-menu', payload: { items: SlashMenuItem[]; active: number }): void;
+  (e: 'slash-menu-close'): void;
+}>();
 
 const root = ref<HTMLDivElement | null>(null);
 let term: Terminal | null = null;
@@ -97,7 +102,25 @@ function connect() {
         recordFrame(data.byteLength);
         term?.write(new Uint8Array(data));
       } else {
-        dbg('rx non-binary frame:', typeof data, data);
+        // 文本帧:尝试解析 slash-menu* JSON。失败的非 JSON 文本仍走 dbg。
+        let frame: SlashMenuFrame | null = null;
+        if (typeof data === 'string') {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed && (parsed.type === 'slash-menu' || parsed.type === 'slash-menu-close')) {
+              frame = parsed as SlashMenuFrame;
+            }
+          } catch { /* not JSON */ }
+        }
+        if (frame) {
+          if (frame.type === 'slash-menu') {
+            emit('slash-menu', { items: frame.items, active: frame.active });
+          } else {
+            emit('slash-menu-close');
+          }
+        } else {
+          dbg('rx non-binary frame:', typeof data, data);
+        }
       }
     },
     onStatus: s => {
