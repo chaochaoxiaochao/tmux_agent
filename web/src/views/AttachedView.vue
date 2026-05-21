@@ -118,12 +118,46 @@ function onDragLeave(_e: DragEvent) {
   dragDepth = Math.max(0, dragDepth - 1);
   if (dragDepth === 0) dragActive.value = false;
 }
+// 桌面拖拽: 直接上传 + 把 @<path> 注入到终端的 PTY 输入区 (用户熟悉的体验)。
+// 手机走 composer 的 📎/粘贴, 没有拖拽场景。
 async function onDrop(e: DragEvent) {
   dragDepth = 0;
   dragActive.value = false;
   const files = e.dataTransfer?.files;
   if (!files || !files.length) return;
-  pendingFiles.value = Array.from(files);
+  for (const f of Array.from(files)) {
+    void injectAttachment(f);
+  }
+}
+
+async function injectAttachment(file: File) {
+  try {
+    const b64 = await fileToBase64(file);
+    const r = await api.upload(
+      props.session,
+      props.id,
+      file.name || 'pasted',
+      file.type || 'application/octet-stream',
+      b64,
+    );
+    // Trailing space 方便用户接着打 prompt; 不带换行, 由用户自己回车发送。
+    await api.send(props.session, props.id, `@${r.path} `);
+  } catch (e: any) {
+    alert(`upload failed: ${e.message ?? e}`);
+  }
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = r.result as string;
+      const idx = s.indexOf(',');
+      res(idx >= 0 ? s.slice(idx + 1) : s);
+    };
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
 }
 function hasFiles(e: DragEvent): boolean {
   // dataTransfer.types includes 'Files' when OS files are being dragged.

@@ -309,7 +309,12 @@ function onKeydown(ev: KeyboardEvent) {
       return;
     }
   }
-  // 普通模式: Enter = send; Shift+Enter = 换行
+  // 普通模式 Enter 语义按设备分:
+  //   - 桌面: Enter = send, Shift+Enter = 换行 (传统习惯)
+  //   - 触屏: Enter = 换行 (textarea 原生), 发送只能点 send 按钮
+  //     原因: 手机系统输入法的"换行/Go"键发的就是 Enter, 拦走会让用户无法
+  //     输入多行 prompt; 而手机用户已经习惯靠 send 按钮发送 (微信/IM 都这样)
+  if (isTouchDevice) return;
   if (ev.key === 'Enter' && !ev.shiftKey) {
     ev.preventDefault();
     send();
