@@ -10,13 +10,9 @@ export function registerSlashRoutes(app: FastifyInstance) {
       reply.status(400).send({ error: 'missing_params', message: 'session and windowId required' });
       return;
     }
-    let panes;
-    try {
-      panes = await app.tmux.listPanes(session, windowId);
-    } catch (e: any) {
-      reply.status(500).send({ error: 'listPanes_failed', message: e?.message ?? 'tmux error' });
-      return;
-    }
+    // listPanes swallows tmux errors and returns []; empty / no-active-pane /
+    // non-claude all fall through to the same "no items" reply below.
+    const panes = await app.tmux.listPanes(session, windowId);
     const active = panes.find(p => p.active);
     if (active?.cmd !== 'claude') {
       reply.send({ items: [] });
