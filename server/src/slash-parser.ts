@@ -9,21 +9,24 @@ function stripAnsi(s: string): string {
   return s.replace(ANSI_CSI, '');
 }
 
-// 高亮 SGR:任意包含 7m 的 CSI 序列。
-const HIGHLIGHT_SGR = /\x1b\[[0-9;]*7[;0-9]*m/;
+// 高亮 SGR:7 作为独立参数(reverse video),不与 27/37/47/97 等多位参数误匹配。
+const HIGHLIGHT_SGR = /\x1b\[(?:[0-9;]*;)?7(?:;[0-9;]*)?m/;
 
 export function parseSlashMenu(buf: string): SlashParseResult {
   const rawLines = buf.split('\n');
 
-  let topIdx = -1, bottomIdx = -1;
-  for (let i = 0; i < rawLines.length; i++) {
-    const plain = stripAnsi(rawLines[i]);
-    if (topIdx < 0 && plain.includes('╭')) topIdx = i;
-    else if (topIdx >= 0 && plain.includes('╰')) { bottomIdx = i; break; }
+  // 自底向上找最近的 ╰,再向上找最近的 ╭,避免旧菜单残留的 ╭ 锁死扫描。
+  let bottomIdx = -1;
+  for (let i = rawLines.length - 1; i >= 0; i--) {
+    if (stripAnsi(rawLines[i]).includes('╰')) { bottomIdx = i; break; }
   }
-  if (topIdx < 0 || bottomIdx < 0 || bottomIdx <= topIdx) {
-    return { state: 'idle' };
+  if (bottomIdx < 0) return { state: 'idle' };
+
+  let topIdx = -1;
+  for (let i = bottomIdx - 1; i >= 0; i--) {
+    if (stripAnsi(rawLines[i]).includes('╭')) { topIdx = i; break; }
   }
+  if (topIdx < 0) return { state: 'idle' };
 
   const items: SlashMenuItem[] = [];
   let active = 0;

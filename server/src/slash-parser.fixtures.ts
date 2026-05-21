@@ -43,3 +43,21 @@ export const FIX_SPINNER_BOX = `\
 │  ⠋  thinking...         │
 ╰─────────────────────────╯
 `;
+
+export const FIX_MENU_WITH_FG_COLORS = `\
+> /_
+╭─────────────────────────────────────────╮
+│  \x1b[37m/clear\x1b[0m      clear conversation         │
+│  \x1b[97m/compact\x1b[0m    compact context            │
+╰─────────────────────────────────────────╯
+`;
+
+export const FIX_STALE_TOP_THEN_REAL_MENU = `\
+old text ╭ leftover from earlier
+some normal output
+prompt> /_
+╭─────────────────────────────────────────╮
+│  /clear      clear conversation         │
+│  /help       show help                  │
+╰─────────────────────────────────────────╯
+`;
