@@ -28,16 +28,9 @@
       :pending-files="pendingFiles"
       @pending-consumed="pendingFiles = []"
     />
-    <InputDialog
-      v-model:open="dialogOpen"
-      :session="session"
-      :window-id="id"
-      :initial-files="pendingFiles"
-    />
 
     <!-- drag-and-drop overlay: shows while a file is being dragged over the
-         page. On drop we open InputDialog with the files pre-loaded so the
-         user can add a message and send. -->
+         page. On drop we inject files directly to the terminal. -->
     <div v-if="dragActive" class="drop-overlay">
       <div class="drop-box">
         <div class="drop-icon">⬇</div>
@@ -52,12 +45,10 @@ import { computed, onMounted, ref, watch } from 'vue';
 import XtermPane from '../components/XtermPane.vue';
 import ScrollControls from '../components/ScrollControls.vue';
 import AttachedComposer from '../components/AttachedComposer.vue';
-import InputDialog from '../components/InputDialog.vue';
 import PaneStrip from '../components/PaneStrip.vue';
 import { api } from '../api';
 
 const props = defineProps<{ session: string; id: string }>();
-const dialogOpen = ref(false);
 const pendingFiles = ref<File[]>([]);
 const dragActive = ref(false);
 let dragDepth = 0;
@@ -177,9 +168,6 @@ async function onEnter() {
 
 onMounted(onEnter);
 watch(() => [props.session, props.id], onEnter);
-// Clear pendingFiles once the dialog has consumed them, so a later re-open
-// (e.g. mobile tap on terminal) doesn't accidentally re-upload old files.
-watch(dialogOpen, (v) => { if (!v) pendingFiles.value = []; });
 </script>
 
 <style scoped>
