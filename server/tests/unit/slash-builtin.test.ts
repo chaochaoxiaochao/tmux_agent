@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BUILTIN_SLASH, mergeBuiltin } from '../../src/slash-builtin';
+import { BUILTIN_SLASH, mergeBuiltin } from '../../src/slash-builtin.js';
 
 describe('BUILTIN_SLASH', () => {
   it('contains 8 high-frequency commands', () => {
