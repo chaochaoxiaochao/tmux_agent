@@ -1,7 +1,12 @@
 <template>
   <div class="composer">
-    <!-- 输入框 + send 按钮。Enter / 点击 send 走 api.send 发文本,清空并 blur。
-         功能键(Esc/Ctrl+C/Yes/No/方向键)由 ScrollControls 提供,不在 composer 里重复。 -->
+    <div class="picker-anchor">
+      <MentionPicker
+        :items="completionItems"
+        :active="completionActive"
+        @pick="pickCompletion"
+      />
+    </div>
     <div class="inputrow">
       <textarea
         ref="inputEl"
@@ -24,6 +29,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { api } from '../api';
+import MentionPicker from './MentionPicker.vue';
+import type { CompletionItem } from '../types';
 
 const props = defineProps<{
   session: string;
@@ -55,6 +62,63 @@ function autoGrow() {
 
 watch(text, () => nextTick(autoGrow));
 
+const completionItems = ref<CompletionItem[]>([]);
+const completionActive = ref(0);
+const completionTrigger = ref<'/' | '@' | null>(null);
+
+function detectTrigger(): { char: '/' | '@'; suffix: string } | null {
+  const v = text.value;
+  for (let i = v.length - 1; i >= 0; i--) {
+    const c = v[i];
+    if (c === ' ' || c === '\n') return null;
+    if (c === '/' || c === '@') return { char: c as '/' | '@', suffix: v.slice(i + 1) };
+  }
+  return null;
+}
+
+// per-instance token (script setup top-level let 实际是模块级共享 —— Vue 3 SFC 坑;
+// 多实例同页会互相吞掉补全请求。包成 ref 让每个 instance 独立。)
+const completionToken = ref(0);
+watch(text, async () => {
+  const trig = detectTrigger();
+  if (!trig) {
+    completionItems.value = [];
+    completionTrigger.value = null;
+    return;
+  }
+  completionTrigger.value = trig.char;
+  const token = ++completionToken.value;
+  try {
+    const items: CompletionItem[] = trig.char === '@'
+      ? await api.files(trig.suffix)
+      : await api.commands(trig.suffix);
+    // 防止旧请求晚到覆盖新结果
+    if (token !== completionToken.value) return;
+    completionItems.value = items;
+    completionActive.value = 0;
+  } catch {
+    if (token === completionToken.value) completionItems.value = [];
+  }
+});
+
+function pickCompletion(it: CompletionItem) {
+  const trig = detectTrigger();
+  if (!trig) return;
+  // text 末尾 = '<trig.char><trig.suffix>',需替换这一段
+  const drop = 1 + trig.suffix.length; // 含触发字符
+  const before = text.value.slice(0, text.value.length - drop);
+  if (it.kind === 'file') {
+    // @file: 追加 @<path>(尾随空格,光标留后)
+    text.value = before + `@${it.path} `;
+  } else {
+    // /cmd: 替换为 payload,留框内等用户再按 send (与 Wall InputBar 历史行为一致)
+    text.value = before + it.payload;
+  }
+  completionItems.value = [];
+  completionTrigger.value = null;
+  nextTick(() => inputEl.value?.focus());
+}
+
 async function send() {
   if (!canSend.value) return;
   const body = text.value + '\n';
@@ -71,6 +135,32 @@ async function send() {
 }
 
 function onKeydown(ev: KeyboardEvent) {
+  // 补全菜单展开时,方向键 / Enter / Esc 给菜单用
+  if (completionItems.value.length) {
+    if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      completionActive.value = (completionActive.value + 1) % completionItems.value.length;
+      return;
+    }
+    if (ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      completionActive.value =
+        (completionActive.value - 1 + completionItems.value.length) % completionItems.value.length;
+      return;
+    }
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      pickCompletion(completionItems.value[completionActive.value]);
+      return;
+    }
+    if (ev.key === 'Escape') {
+      ev.preventDefault();
+      completionItems.value = [];
+      completionTrigger.value = null;
+      return;
+    }
+  }
+  // 普通模式: Enter = send; Shift+Enter = 换行
   if (ev.key === 'Enter' && !ev.shiftKey) {
     ev.preventDefault();
     send();
@@ -83,6 +173,18 @@ function onKeydown(ev: KeyboardEvent) {
   display: flex; flex-direction: column;
   border-top: 1px solid #222;
   background: var(--bg-alt);
+  position: relative;
+}
+.picker-anchor {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 100%;          /* 浮在 composer 顶部之上,不挡输入框 */
+  pointer-events: none;  /* 允许 MentionPicker 内部 .picker 自己接事件,wrapper 不挡 */
+}
+.picker-anchor :deep(.picker) {
+  position: static;       /* 覆盖 MentionPicker 原 absolute */
+  margin: 0 8px;
+  pointer-events: auto;
 }
 .inputrow {
   display: flex; gap: 8px; align-items: stretch;
