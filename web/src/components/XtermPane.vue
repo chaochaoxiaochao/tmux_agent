@@ -137,11 +137,18 @@ onMounted(() => {
   fit.fit();
 
   // 防止 xterm 自动 focus 弹手机原生键盘: xterm 在 open() 后会渲染一个
-  // .xterm-helper-textarea 用来接键盘事件。把它的 tabIndex 设 -1,
-  // 用户点终端区不会让它抢焦点。term.onData 仍保留，作桌面端真聚焦
-  // (用户主动 Tab / 点击 helper textarea) 的 fallback。
+  // .xterm-helper-textarea 用来接键盘事件。tabIndex=-1 只防 Tab,
+  // 阻不住点击 focus,所以触屏额外加 readonly + inputMode='none'
+  // (移动浏览器看 inputMode=none 不弹键盘)。桌面端保留默认,选中复制不影响。
   const helperTa = root.value.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
-  if (helperTa) helperTa.tabIndex = -1;
+  if (helperTa) {
+    helperTa.tabIndex = -1;
+    const isTouchDevice = 'ontouchstart' in window;
+    if (isTouchDevice) {
+      helperTa.readOnly = true;
+      helperTa.inputMode = 'none';
+    }
+  }
 
   connect();
 
