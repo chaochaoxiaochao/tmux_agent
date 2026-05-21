@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import websocketPlugin from '@fastify/websocket';
 import * as pty from 'node-pty';
 import { getSlashList } from './slash-cache.js';
+import { PaneMetaPusher } from './pane-meta-pusher.js';
+import { register, unregister } from './pane-meta-registry.js';
 
 const PREWARM_DELAY_MS = 200;  // 等 selectWindow + attach 稳
 
@@ -38,6 +40,15 @@ export async function registerPtyBridge(app: FastifyInstance) {
 
     let killFallback: NodeJS.Timeout | null = null;
 
+    const paneMetaPusher = new PaneMetaPusher(
+      app.tmux,
+      session,
+      id,
+      (frame) => { try { conn.send(JSON.stringify(frame)); } catch { /* dead */ } },
+    );
+    register(session, id, paneMetaPusher);
+    paneMetaPusher.start();
+
     ptyProc.onData(data => {
       try { conn.send(data, { binary: true }); } catch { /* dead */ }
     });
@@ -60,6 +71,8 @@ export async function registerPtyBridge(app: FastifyInstance) {
     });
 
     conn.on('close', () => {
+      unregister(session, id, paneMetaPusher);
+      paneMetaPusher.dispose();
       // SIGHUP gives the tmux client a chance to exit cleanly. If it's stuck in
       // a syscall (common when WeChat webview drops the WS abruptly), SIGHUP is
       // ignored — fall back to SIGKILL after 1s so the kernel force-closes the
