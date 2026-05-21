@@ -78,7 +78,11 @@ export async function registerPtyBridge(app: FastifyInstance) {
       try {
         const panes = await app.tmux.listPanes(session, id);
         const active = panes.find(p => p.active);
-        if (active?.cmd !== 'claude') return;
+        if (active?.cmd !== 'claude') {
+          // 显式推空 list 覆盖前端 cache (跨 window 复用 composer 时防止上一份残留)
+          try { conn.send(JSON.stringify({ type: 'slash-menu-list', items: [] })); } catch { /* dead */ }
+          return;
+        }
         const cwd = active.path || process.env.HOME || '/';
         const r = await getSlashList(cwd);
         try {
