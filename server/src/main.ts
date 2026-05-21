@@ -1,5 +1,6 @@
 import { loadConfig } from './config.js';
 import { buildServer } from './server.js';
+import { startUploadGc } from './upload-gc.js';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -30,6 +31,7 @@ export async function main() {
   const app = await buildServer({ ...cfg, configPath } as any);
   await app.listen({ host: cfg.server.host, port: cfg.server.port });
   app.log.info(`tmux-agent listening on http://${cfg.server.host}:${cfg.server.port}`);
+  startUploadGc(msg => app.log.info(msg));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
