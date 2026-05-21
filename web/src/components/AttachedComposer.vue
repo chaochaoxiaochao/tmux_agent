@@ -254,103 +254,60 @@ function detectTrigger(): { char: '/' | '@'; suffix: string } | null {
 const completionToken = ref(0);
 
 // 6.2 当 text 首字符从非 / 切到 /,决定 mirror / local 模式
-// generation token: 每次新 /-led 进入 +1。晚到的 api.panes 看到 myGen != current 就作废自己。
-let slashDecisionGen = 0;
 let slashDecisionInFlight = false;
 watch(text, async (val, prev) => {
   const wasSlashLed = !!prev && prev.startsWith('/');
   const isSlashLed = val.startsWith('/');
-
   if (isSlashLed && !wasSlashLed) {
     if (slashDecisionInFlight) return;
-    const myGen = ++slashDecisionGen;
     slashDecisionInFlight = true;
     try {
       const panes = await api.panes(props.session, props.windowId);
-      if (myGen !== slashDecisionGen) return; // 用户已退出/重启,本次决策作废
       const active = panes.find(p => p.active);
       if (active?.cmd === 'claude') {
         slashMode.value = 'mirror';
         try { await api.send(props.session, props.windowId, '/'); } catch { /* best effort */ }
-        if (myGen !== slashDecisionGen) return; // 再次校验
         // 同步:防止 6.3 watcher 看到当前 val='/' 再发一次
         mirrorSent.value = val;
       } else {
         slashMode.value = 'local';
       }
     } catch {
-      if (myGen !== slashDecisionGen) return;
       slashMode.value = 'local';
     } finally {
       slashDecisionInFlight = false;
     }
-    return;
   }
-
   if (!isSlashLed && wasSlashLed) {
-    // 即使决策还在 in-flight 也要立刻退出 — gen 翻新让那边作废
-    slashDecisionGen++;
     exitSlashMode();
   }
 });
 
 // 6.3 mirror 态下,把用户在 textarea 的输入增量透传到 PTY
-// 单槽串行队列:in-flight 时不再并发派发,而是把最新的 val 记到 pending,
-// 等当前 send 完了再处理 pending(取最新一次)。
-let mirrorBusy = false;
-let mirrorPending: string | null = null;
-
-async function flushMirror(target: string) {
-  let cur = target;
-  while (true) {
-    const sent = mirrorSent.value;
-    if (cur === sent) break; // 无需变化
-
-    if (cur.startsWith(sent) && cur.length > sent.length) {
-      // 用户在末尾追加字符
-      const delta = cur.slice(sent.length);
-      try { await api.send(props.session, props.windowId, delta); } catch { /* best effort */ }
-    } else if (cur.length < sent.length && sent.startsWith(cur)) {
-      // 用户在末尾删字符
-      const removed = sent.length - cur.length;
-      try {
-        for (let i = 0; i < removed; i++) await api.send(props.session, props.windowId, '\x7f');
-      } catch { /* best effort */ }
-    } else {
-      // 中间编辑/不一致:全量退格 + 重发
-      try {
-        for (let i = 0; i < sent.length; i++) await api.send(props.session, props.windowId, '\x7f');
-        if (cur) await api.send(props.session, props.windowId, cur);
-      } catch { /* best effort */ }
-    }
-    mirrorSent.value = cur;
-
-    // 看 pending,如果用户又输入了新内容,接着消化
-    if (mirrorPending !== null && mirrorPending !== cur) {
-      cur = mirrorPending;
-      mirrorPending = null;
-      continue;
-    }
-    break;
-  }
-}
-
 watch(text, async (val) => {
   if (slashMode.value !== 'mirror') {
     mirrorSent.value = '';
-    mirrorPending = null;
-    mirrorBusy = false;
     return;
   }
-  if (mirrorBusy) {
-    mirrorPending = val; // 覆盖式记录最新
-    return;
-  }
-  mirrorBusy = true;
-  try {
-    await flushMirror(val);
-  } finally {
-    mirrorBusy = false;
+  if (val.startsWith(mirrorSent.value) && val.length > mirrorSent.value.length) {
+    // 用户在末尾追加字符
+    const delta = val.slice(mirrorSent.value.length);
+    try { await api.send(props.session, props.windowId, delta); } catch { /* best effort */ }
+    mirrorSent.value = val;
+  } else if (val.length < mirrorSent.value.length && mirrorSent.value.startsWith(val)) {
+    // 用户在末尾删字符
+    const removed = mirrorSent.value.length - val.length;
+    try {
+      for (let i = 0; i < removed; i++) await api.send(props.session, props.windowId, '\x7f');
+    } catch { /* best effort */ }
+    mirrorSent.value = val;
+  } else if (val !== mirrorSent.value) {
+    // 中间编辑/不一致:全量退格 + 重发
+    try {
+      for (let i = 0; i < mirrorSent.value.length; i++) await api.send(props.session, props.windowId, '\x7f');
+      if (val) await api.send(props.session, props.windowId, val);
+    } catch { /* best effort */ }
+    mirrorSent.value = val;
   }
 });
 
@@ -415,8 +372,6 @@ function exitSlashMode() {
   completionItems.value = [];
   completionTrigger.value = null;
   mirrorSent.value = '';
-  mirrorPending = null;
-  mirrorBusy = false;
   text.value = ''; // 字符已透传给 PTY,留前端冗余
 }
 
