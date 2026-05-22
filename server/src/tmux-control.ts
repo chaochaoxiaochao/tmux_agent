@@ -80,7 +80,7 @@ export class TmuxControl {
   }
 
   async listAllPanes(): Promise<Array<{
-    session: string; windowId: string; windowIndex: number;
+    session: string; windowId: string; windowIndex: number; windowName: string;
     id: string; index: number; active: boolean; size: string;
     cmd: string; path: string; inMode: boolean;
   }>> {

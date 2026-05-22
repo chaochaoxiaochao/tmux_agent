@@ -95,18 +95,19 @@ export function newSession(name: string): string[] {
   return ['new-session', '-d', '-s', name];
 }
 
-const ALL_PANES_FMT = '#{session_name}|#{window_id}|#{window_index}|#{pane_id}|#{pane_index}|#{pane_active}|#{pane_width}x#{pane_height}|#{pane_current_command}|#{pane_current_path}|#{pane_in_mode}';
+const ALL_PANES_FMT = '#{session_name}|#{window_id}|#{window_index}|#{window_name}|#{pane_id}|#{pane_index}|#{pane_active}|#{pane_width}x#{pane_height}|#{pane_current_command}|#{pane_current_path}|#{pane_in_mode}';
 
 export function listAllPanes(): string[] {
   return ['list-panes', '-a', '-F', ALL_PANES_FMT];
 }
 
 export function parseAllPanesLine(line: string) {
-  const [session, windowId, windowIndex, paneId, paneIndex, active, size, cmd, path, inMode] = line.split('|');
+  const [session, windowId, windowIndex, windowName, paneId, paneIndex, active, size, cmd, path, inMode] = line.split('|');
   return {
     session,
     windowId,
     windowIndex: Number(windowIndex),
+    windowName: windowName ?? '',
     id: paneId,
     index: Number(paneIndex),
     active: active === '1',

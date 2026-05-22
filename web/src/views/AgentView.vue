@@ -14,7 +14,7 @@
       >
         <div class="line1">
           <span class="state">{{ stateIcon(a.state) }}</span>
-          <span class="addr">{{ a.session }}:{{ a.windowId }}#{{ a.paneIndex }}</span>
+          <span class="addr">{{ a.session }}:{{ a.windowName || a.windowId }}#{{ a.paneIndex }}</span>
           <span class="age">{{ formatAge(a.lastEventAt) }}</span>
         </div>
         <div class="line2">

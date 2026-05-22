@@ -148,7 +148,7 @@ if [ -n "$snapshot" ]; then
             elif .state == "running" then "🟢 跑着 (" + (.items | length | tostring) + ")"
             else "✅ 刚完成 (" + (.items | length | tostring) + ")" end) as $header
           | ["**" + $header + "**"] + (.items | map(
-              "- [" + .session + ":" + .windowId + "#" + (.paneIndex | tostring) + "](" + $public + "/#/w/" + (.session | @uri) + "/" + (.windowId | @uri) + ") · " +
+              "- [" + .session + ":" + (if (.windowName // "") != "" then .windowName else .windowId end) + "#" + (.paneIndex | tostring) + "](" + $public + "/#/w/" + (.session | @uri) + "/" + (.windowId | @uri) + ") · " +
               (((now - (.lastEventAt / 1000)) | floor | tostring) + "s") +
               " · `" + (.cwd | split("/") | .[-2:] | join("/")) + "`" +
               (if (.lastMessage // "") != "" then " · \"" + .lastMessage + "\"" else "" end) +

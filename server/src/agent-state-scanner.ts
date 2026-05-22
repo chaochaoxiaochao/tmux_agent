@@ -25,13 +25,14 @@ export function startAgentStateScanner(app: FastifyInstance): { stop: () => void
             session: p.session,
             windowId: p.windowId,
             windowIndex: p.windowIndex,
+            windowName: p.windowName,
             paneIndex: p.index,
             cwd: p.path,
             state: 'running',
             lastEventAt: Date.now(),
           });
-        } else if (existing.cwd !== p.path) {
-          upsert({ paneId: p.id, cwd: p.path });
+        } else if (existing.cwd !== p.path || existing.windowName !== p.windowName) {
+          upsert({ paneId: p.id, cwd: p.path, windowName: p.windowName });
         }
       }
       removeMissing(currentIds);
