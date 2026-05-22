@@ -106,7 +106,7 @@ TIME_LINE="\n>Time: \`$(date '+%Y-%m-%d:%H-%M-%S')\`"
 # 上报 agent state 到 tmux-agent registry (供 wall agent view 实时显示 + 下面 GET snapshot 能看到本次事件)。
 if [ -n "$TMUX_PANE" ]; then
   case "$hook_event_name" in
-    Stop) agent_state="stop" ;;
+    Stop) agent_state="done" ;;
     PermissionRequest|Notification) agent_state="request" ;;
     *) agent_state="" ;;
   esac
@@ -143,11 +143,12 @@ if [ -n "$snapshot" ]; then
       .agents
       | group_by(.state)
       | map({state: .[0].state, items: .})
-      | sort_by(if .state == "request" then 0 elif .state == "running" then 1 else 2 end)
+      | sort_by(if .state == "request" then 0 elif .state == "running" then 1 elif .state == "done" then 2 else 3 end)
       | map(
           (if .state == "request" then "⏳ 等输入 (" + (.items | length | tostring) + ")"
             elif .state == "running" then "🟢 跑着 (" + (.items | length | tostring) + ")"
-            else "✅ 刚完成 (" + (.items | length | tostring) + ")" end) as $header
+            elif .state == "done" then "✅ 刚完成 (" + (.items | length | tostring) + ")"
+            else "💤 闲着 (" + (.items | length | tostring) + ")" end) as $header
           | ["**" + $header + "**"] + (.items | map(
               ((.claudeSessionName // "") as $name
                 | (.claudeSessionId // "") as $id

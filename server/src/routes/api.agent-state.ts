@@ -19,8 +19,8 @@ export function registerAgentStateRoutes(app: FastifyInstance): void {
       reply.status(400).send({ error: 'bad_input', message: 'paneId and state required' });
       return;
     }
-    if (b.state !== 'running' && b.state !== 'request' && b.state !== 'stop') {
-      reply.status(400).send({ error: 'bad_input', message: 'state must be running|request|stop' });
+    if (b.state !== 'running' && b.state !== 'request' && b.state !== 'done' && b.state !== 'idle') {
+      reply.status(400).send({ error: 'bad_input', message: 'state must be running|request|done|idle' });
       return;
     }
     upsert({

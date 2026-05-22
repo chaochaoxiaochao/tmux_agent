@@ -38,7 +38,7 @@ export interface PaneMetaFrame {
   windowId: string;
   panes: PaneMetaItem[];
 }
-export type AgentState = 'running' | 'request' | 'stop';
+export type AgentState = 'running' | 'request' | 'done' | 'idle';
 
 export interface AgentEntry {
   paneId: string;

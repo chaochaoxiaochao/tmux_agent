@@ -1,6 +1,10 @@
 import { broadcast } from './wall-channel.js';
 
-export type AgentState = 'running' | 'request' | 'stop';
+// running   = scanner saw status:busy. Claude in flight.
+// request   = hook PermissionRequest / AskUserQuestion. Waiting for user.
+// done      = hook Stop. Just completed a turn (decays to idle after 10min).
+// idle      = scanner saw status:idle. Waiting at prompt.
+export type AgentState = 'running' | 'request' | 'done' | 'idle';
 
 export interface AgentEntry {
   paneId: string;

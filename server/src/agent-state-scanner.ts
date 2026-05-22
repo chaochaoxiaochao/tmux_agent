@@ -3,11 +3,25 @@ import { upsert, removeMissing, snapshot, AgentState } from './agent-state-regis
 import { resolveClaudeSession } from './claude-session-resolver.js';
 
 const SCAN_INTERVAL_MS = 5000;
+const DONE_DECAY_MS = 10 * 60 * 1000;  // 'done' decays to 'idle' after 10 min
 
-// claude session status → AgentState. 'busy' = 正在跑 → running; 'idle' = 闲着 → stop.
-// 'request'(等审批/AskUserQuestion)claude 不写在 sessions 文件,由 hook 显式 POST 覆盖。
-function mapClaudeStatus(status: string): AgentState {
-  return status === 'busy' ? 'running' : 'stop';
+// 给定 claude 进程 .status,推 scanner 想写的状态。hook 设的 request/done 在外层另判。
+function mapScannerState(status: string): AgentState {
+  return status === 'busy' ? 'running' : 'idle';
+}
+
+// 综合 hook 状态(existing.state)和 scanner 观察到的真实状态(scannerState),决定最终 state。
+// - request 永不衰减,scanner 不覆盖
+// - done 10min 内保留;超过 10min 由 scanner 状态接管(通常变 idle)
+// - 其他 (running / idle) 直接跟随 scanner
+function reconcileState(existingState: AgentState | undefined, existingTs: number | undefined, scannerState: AgentState, now: number): AgentState {
+  if (existingState === 'request') return 'request';
+  if (existingState === 'done') {
+    const age = existingTs ? now - existingTs : Infinity;
+    if (age < DONE_DECAY_MS) return 'done';
+    // decayed → fall through to scanner state
+  }
+  return scannerState;
 }
 
 export function startAgentStateScanner(app: FastifyInstance): { stop: () => void } {
@@ -27,10 +41,8 @@ export function startAgentStateScanner(app: FastifyInstance): { stop: () => void
         currentIds.add(p.id);
         const claudeInfo = await resolveClaudeSession(p.panePid);
         const existing = existingMap.get(p.id);
-        // 不覆盖 hook 设的 request 状态:那是"等用户审批/输入",sessions 文件看不出来。
-        // existing.state === 'request' 时保留,直到下次 hook POST 改变。
-        const newState = existing?.state === 'request' ? 'request'
-          : (claudeInfo ? mapClaudeStatus(claudeInfo.status) : 'running');
+        const scannerState: AgentState = claudeInfo ? mapScannerState(claudeInfo.status) : 'running';
+        const newState = reconcileState(existing?.state, existing?.lastEventAt, scannerState, Date.now());
         // 状态发生变化时(包括首次发现)bump lastEventAt;否则保留旧值。
         const bumpTime = !existing || existing.state !== newState;
         upsert({

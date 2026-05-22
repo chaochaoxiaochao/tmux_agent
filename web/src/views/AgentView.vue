@@ -47,7 +47,7 @@ import type { AgentEntry, AgentStateFrame, AgentState } from '../types';
 const router = useRouter();
 const agents = ref<AgentEntry[]>([]);
 
-const STATE_ORDER: AgentState[] = ['request', 'running', 'stop'];
+const STATE_ORDER: AgentState[] = ['request', 'running', 'done', 'idle'];
 
 const groups = computed(() => STATE_ORDER.map(state => ({
   state,
@@ -57,13 +57,17 @@ const groups = computed(() => STATE_ORDER.map(state => ({
 })));
 
 function stateIcon(s: AgentState): string {
-  return s === 'running' ? '▶' : s === 'request' ? '⏳' : '✅';
+  if (s === 'request') return '⏳';
+  if (s === 'running') return '▶';
+  if (s === 'done') return '✅';
+  return '💤';
 }
 
 function groupHeader(s: AgentState, n: number): string {
   if (s === 'request') return `⏳ 等输入 (${n})`;
   if (s === 'running') return `🟢 跑着 (${n})`;
-  return `✅ 刚完成 (${n})`;
+  if (s === 'done') return `✅ 刚完成 (${n})`;
+  return `💤 闲着 (${n})`;
 }
 
 function claudeLabel(a: AgentEntry): string {
@@ -125,7 +129,8 @@ onUnmounted(() => ws?.close());
 }
 .group-header.st-request { color: var(--warn); }
 .group-header.st-running { color: var(--accent); }
-.group-header.st-stop    { color: var(--ink-dim); }
+.group-header.st-done    { color: var(--ink); }
+.group-header.st-idle    { color: var(--ink-dim); }
 .row {
   padding: 10px 12px; margin-bottom: 6px;
   border-left: 3px solid var(--ink-faint);
@@ -135,7 +140,8 @@ onUnmounted(() => ws?.close());
 }
 .row.st-request { border-left-color: var(--warn); }
 .row.st-running { border-left-color: var(--accent); }
-.row.st-stop    { border-left-color: var(--ink-dim); }
+.row.st-done    { border-left-color: var(--ink); }
+.row.st-idle    { border-left-color: var(--ink-dim); }
 .row:hover { background: #1c1c1c; }
 .line1 { display: flex; align-items: baseline; gap: 8px; font: 13px ui-monospace, monospace; }
 .line1 .state { font-size: 14px; }
