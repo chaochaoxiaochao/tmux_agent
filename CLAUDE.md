@@ -20,8 +20,9 @@ tmux_agent/
     main.ts             # 真入口 (systemd ExecStart 指向编译产物 dist/main.js)
     server.ts           # buildServer() factory, 不含 listen
     routes/             # REST + WS endpoints (api.windows / api.upload / api.completion / api.notify / api.debug / api.slash)
-    tmux-control.ts     # 通过 tmux 命令行 + pipe-pane 跟 tmux 交互 (PaneMeta 含 cwd / cmd / size / active)
-    pty-bridge.ts       # node-pty + WS 桥, 把 tmux pane 字节流推给浏览器 + ws-open 时调 getSlashList 预热 slash list
+    tmux-control.ts     # 通过 tmux 命令行 + pipe-pane 跟 tmux 交互 (PaneMeta 含 cwd / cmd / size / active / inMode)
+    pty-bridge.ts       # node-pty + WS 桥, 把 tmux pane 字节流推给浏览器 + ws-open 时调 getSlashList 预热 slash list + 绑定 PaneMetaPusher
+    pane-meta-{pusher,registry}.ts  # 每 WS 连接 1 个 PaneMetaPusher (2s 嗅探 + diff push, pushing 互斥锁); REST handler 通过 pane-meta-registry.pushNow(session,windowId) 触发立即推; 注册表按 (session,windowId) → Set<pusher> 广播到所有连同一 window 的 WS
     upload-gc.ts        # 后台 GC, 删 ~/.local/share/tmux-agent/uploads/ 下 7 天未访问文件
     slash-{types,builtin,sdk,cache}.ts  # composer / 补全 = Claude Agent SDK init message 拿 list + cwd-keyed cache + 8 内置写死合并
   web/src/
@@ -48,7 +49,7 @@ tmux_agent/
 
 - **手机端 Enter 语义** —— AttachedComposer 在 `isTouchDevice` 时 Enter = 换行 (textarea 原生), 桌面才是 Enter = send + Shift+Enter = 换行。手机系统输入法的"换行键"发的就是 Enter, 拦了等于断了换行能力。见 `context/experience/general/mobile-textarea-enter-isnt-send.md`。
 
-- **`/` 补全 = Claude Agent SDK init message** —— 用 `@anthropic-ai/claude-agent-sdk` 短命子进程读 `system/init` 拿 `slash_commands` 字段, 复用本地 OAuth (apiKeySource: none, 0 token, 本地工作)。server `slash-cache.ts` 用 pane cwd 作 key + 10 分钟 TTL + stale-while-revalidate;前端 composer cache 收 `slash-menu-list` WS 帧填充, 用户打 `/` 走前端 startsWith 过滤,点 🔄 button(header banner)强刷。8 个内置(`/clear /compact /cost /help /resume /agents /model /config`)写死在 `slash-builtin.ts` 与 SDK 返回合并,SDK 优先 dedup。配置 `~/.config/tmux-agent/config.yaml` 的 `commands:` 段已彻底废除。详见 `context/experience/general/claude-agent-sdk-init-message-for-slash-list.md` 和 `context/experience/project/tmux_agent/pty-bytes-not-screen-snapshot.md`(为什么没走 PTY 字节流路)。
+- **`/` 补全 = Claude Agent SDK `q.supportedCommands()`** —— `slash-sdk.ts:fetchSlashList()` 用**永挂 async iterable** 作 prompt 让 SDK 进 streaming-input 模式但**永不 yield** 用户消息, 然后调 `q.supportedCommands()` 走控制协议从 SDK 初始化状态读 slash 列表 — 0 token、0 Anthropic round-trip、0 Stop hook 触发、~1s 完成。SlashCommand 自带 `description` 所以 SlashMenuItem 的 `desc` 也填充了。⚠️ **不要回退到 `prompt:'x' + for await...break` 那种"假装 abort 在 init 后阻止 prompt 送达"的写法** — AbortController 触发太晚, prompt 仍跑完一整轮 turn, 每次烧 ~25k cache_creation + 5 output tokens + 触发 Stop hook 推一条无链接的企微通知(因为 SDK 子进程没 TMUX_PANE)。server `slash-cache.ts` 用 pane cwd 作 key + 10 分钟 TTL + stale-while-revalidate;前端 composer cache 收 `slash-menu-list` WS 帧填充, 用户打 `/` 走前端 startsWith 过滤,点 🔄 button(header banner)强刷。8 个内置(`/clear /compact /cost /help /resume /agents /model /config`)写死在 `slash-builtin.ts` 与 SDK 返回合并,SDK 优先 dedup。配置 `~/.config/tmux-agent/config.yaml` 的 `commands:` 段已彻底废除。详见 `context/experience/general/claude-agent-sdk-init-message-for-slash-list.md` 和 `context/experience/project/tmux_agent/pty-bytes-not-screen-snapshot.md`(为什么没走 PTY 字节流路)。
 
 - **`ReconnectingWS.onMessage` 收到的文本帧是已 `JSON.parse` 的 object, 不是 raw string** —— `web/src/ws.ts` 在 callback 上游就 parse 了。新增 WS frame consumer 时判断要写 `typeof data === 'object'` + `data.type === '...'`,不是 `typeof === 'string'` + `JSON.parse(data)`。坑过 c7fd078,详见 `context/experience/project/tmux_agent/ws-onmessage-receives-parsed-object.md`。
 
@@ -57,3 +58,9 @@ tmux_agent/
 - **upload 文件 7 天自动清** —— `server/src/upload-gc.ts` 启动扫一次 + 每 24h 扫一次。删 mtime > 7 天的文件 + 顺手 rmdir 空目录。无 config 旋钮 (写死)。
 
 - **ScrollControls vs AttachedComposer 分工** —— Esc/Tab/方向键/Yes/No/Ctrl+C/⏎ 在 ScrollControls (已有), composer 不要重复实现功能键。曾经 attached-composer Task 2 撞过这个坑, 撤销了重复的 fnkey 栏。
+
+- **编译验证用 `npm run build`, 不要 `tsc --noEmit`** —— web 子包没装独立 vue-shim.d.ts, 裸 `npx tsc --noEmit` 会报 3 个 `.vue` 模块 implicit any 假阳性 (App.vue / WindowWall.vue / AttachedView.vue), 跟当前改动无关。`npm run build` 走 `vue-tsc -b && vite build`, 能正确处理 `.vue` 文件。implementer subagent 在 plan 里写编译验证步骤时统一用 `npm run build`。server 子包仍可用裸 `tsc --noEmit` (没 .vue 文件)。详见 `context/experience/project/tmux_agent/web-tsc-noemit-vue-false-positives.md`。
+
+- **ScrollControls 的 copy-mode 状态由 AttachedView 下发** —— pane-meta-ws-push task 后, `ScrollControls.inCopyMode` 不再是本地 ref, 是 `AttachedView` 计算的 `activePane?.inMode ?? false` prop。要加新的"跟随 copy-mode 状态显隐 / 禁用"按钮, 从 ScrollControls 的 props 拿, 不要在该组件里自建 ref 跟踪。`toggleHistory` 也不写本地状态, 调 REST 后等 server 推 pane-meta 帧回来更新 prop。
+
+- **tmux 状态有 pane / session / client 三层 scope** —— `pane_in_mode` / `pane_current_command` / cwd 是 pane 级 (全 client 共享, 一个 client 让 pane 进 copy-mode 所有 client 都看到), `select-window` 影响 session 级 active window (跨 client 互相切窗口), 各 client 的 viewport size / 焦点是 client 级。设计任何调 tmux 命令的 RPC / WS 帧时先想清楚 scope, 想要 per-client 隔离 (如让 web 端切 window 不影响电脑直接 attach 的那个 client) 要走 `tmux new-session -t orig -s derived` 派生 grouped session。详见 `context/experience/project/tmux_agent/tmux-state-scope-per-client-vs-shared.md`。
