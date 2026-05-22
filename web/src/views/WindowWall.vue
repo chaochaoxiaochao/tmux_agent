@@ -1,8 +1,8 @@
 <template>
   <div class="wall">
     <header class="bar">
-      <button class="active" disabled>tile</button>
-      <button @click="$router.push('/agent')">🤖 agent</button>
+      <span class="bc">🪟 wall</span>
+      <button @click="$router.push('/agent')">🤖 agent →</button>
     </header>
     <div v-if="status !== 'open'" class="status-banner">● {{ status }}</div>
     <div v-if="snap && snap.sessions.length === 0" class="empty">
@@ -171,8 +171,8 @@ function humanAge(ms: number): string {
   background: transparent; border: 1px solid var(--ink-faint); color: var(--ink-dim);
   cursor: pointer;
 }
-.bar button.active { background: var(--accent); color: #000; border-color: var(--accent); cursor: default; }
-.bar button:hover:not(.active):not(:disabled) { border-color: var(--accent); color: var(--ink); }
+.bar button:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); }
+.bar .bc { color: var(--ink-dim); font: 13px ui-monospace, monospace; margin-left: 4px; }
 
 .session { margin-bottom: 22px; }
 .session-header {

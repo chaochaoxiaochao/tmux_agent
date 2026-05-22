@@ -1,8 +1,8 @@
 <template>
   <div class="agent-view">
     <header class="bar">
-      <button @click="$router.push('/')">tile</button>
-      <button class="active" disabled>🤖 agent</button>
+      <button @click="$router.push('/')">← wall</button>
+      <span class="bc">🤖 agent</span>
     </header>
     <div class="list">
       <template v-for="g in groups" :key="g.state">
@@ -117,8 +117,8 @@ onUnmounted(() => ws?.close());
   background: transparent; border: 1px solid var(--ink-faint); color: var(--ink-dim);
   cursor: pointer;
 }
-.bar button.active { background: var(--accent); color: #000; border-color: var(--accent); cursor: default; }
-.bar button:hover:not(.active):not(:disabled) { border-color: var(--accent); color: var(--ink); }
+.bar button:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); }
+.bar .bc { color: var(--ink-dim); font: 13px ui-monospace, monospace; margin-left: 4px; }
 .list { flex: 1; overflow-y: auto; padding: 8px 12px; }
 .group { margin-bottom: 14px; }
 .group-header {
