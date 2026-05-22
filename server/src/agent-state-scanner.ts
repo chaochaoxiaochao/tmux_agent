@@ -5,16 +5,20 @@ const SCAN_INTERVAL_MS = 5000;
 
 export function startAgentStateScanner(app: FastifyInstance): { stop: () => void } {
   let stopped = false;
+  let scanning = false;
 
   async function scan(): Promise<void> {
     if (stopped) return;
+    if (scanning) return;
+    scanning = true;
     try {
       const panes = await app.tmux.listAllPanes();
+      const existingMap = new Map(snapshot().map(e => [e.paneId, e]));
       const currentIds = new Set<string>();
       for (const p of panes) {
         if (p.cmd !== 'claude') continue;
         currentIds.add(p.id);
-        const existing = snapshot().find(e => e.paneId === p.id);
+        const existing = existingMap.get(p.id);
         if (!existing) {
           upsert({
             paneId: p.id,
@@ -33,6 +37,8 @@ export function startAgentStateScanner(app: FastifyInstance): { stop: () => void
       removeMissing(currentIds);
     } catch {
       // tmux 暂时不通,跳过
+    } finally {
+      scanning = false;
     }
   }
 

@@ -84,10 +84,8 @@ export class TmuxControl {
     id: string; index: number; active: boolean; size: string;
     cmd: string; path: string; inMode: boolean;
   }>> {
-    try {
-      const { stdout } = await this.run(cmd.listAllPanes());
-      return stdout.trim().split('\n').filter(Boolean).map(cmd.parseAllPanesLine);
-    } catch { return []; }
+    const { stdout } = await this.run(cmd.listAllPanes());
+    return stdout.trim().split('\n').filter(Boolean).map(cmd.parseAllPanesLine);
   }
 
   async selectPane(session: string, windowId: string, paneId: string): Promise<void> {
