@@ -12,6 +12,7 @@ import { registerPtyBridge } from './pty-bridge.js';
 import { registerWallSnapshots } from './wall-snapshots.js';
 import { registerWallWebSocket } from './wall-channel.js';
 import { startAgentStateScanner } from './agent-state-scanner.js';
+import { registerAgentStateRoutes } from './routes/api.agent-state.js';
 import fastifyStatic from '@fastify/static';
 import * as path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -41,6 +42,7 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   await registerPtyBridge(app);
   registerWallWebSocket(app);
   registerWallSnapshots(app);
+  registerAgentStateRoutes(app);
   startAgentStateScanner(app);
 
   const webDist = path.resolve(__dirname, '../../web/dist');
