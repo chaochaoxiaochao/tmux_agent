@@ -2,8 +2,18 @@
 # 企业微信通知 Hook - 当 Claude Code 发送通知时，同步推送到企业微信，
 # 同时通知 tmux-agent 让对应 window 在 wall 上闪烁。
 #
-# Install: cp docs/notify_wechat.sh ~/.claude/hooks/ && chmod +x ~/.claude/hooks/notify_wechat.sh
-# 然后改下面的 WECOM_WEBHOOK 为你自己的企微机器人 webhook URL.
+# Install: run scripts/install-wechat-hook.sh — it copies this script to ~/.claude/hooks/ and writes notify_wechat.env with your webhook URL.
+
+# Source webhook URL from external env file (see scripts/install-wechat-hook.sh).
+ENV_FILE="$(dirname "$0")/notify_wechat.env"
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+fi
+if [ -z "$WECOM_WEBHOOK_URL" ]; then
+  echo "ERR: WECOM_WEBHOOK_URL not set in $ENV_FILE — run scripts/install-wechat-hook.sh" >&2
+  exit 0
+fi
 
 json_input=$(cat)
 
@@ -68,9 +78,7 @@ if [ -n "$TMUX_S" ] && [ -n "$TMUX_W" ]; then
 fi
 
 # 组装企微 markdown 消息
-# !!! 改成你自己的企微机器人 webhook URL !!!
-# 群机器人 → 添加 → 选择「群机器人」→ 复制 webhook URL
-WECOM_WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+WECOM_WEBHOOK="$WECOM_WEBHOOK_URL"
 # Session 行: 优先 session_name (用户 /rename 设的);没设则 fallback "<cwd末段>".
 session_label="${session_name:-$project_short}"
 if [ "$hook_event_name" = "Stop" ]; then
