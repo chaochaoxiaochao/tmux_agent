@@ -8,6 +8,7 @@
   >
     <header class="bar">
       <button @click="$router.push('/')">← wall</button>
+      <button @click="$router.push('/agent')">🤖 agent</button>
       <span class="bc">{{ session }} : {{ id }}</span>
       <span class="spacer"></span>
       <button class="refresh-slash" :class="refreshState" @click="handleRefreshSlash" :disabled="refreshState === 'loading'" :title="refreshTitle">
