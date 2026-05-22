@@ -69,7 +69,15 @@ function goAttached(a: AgentEntry) {
 }
 
 let ws: ReconnectingWS | null = null;
-onMounted(() => {
+onMounted(async () => {
+  try {
+    const r = await fetch('/api/agent-state/snapshot');
+    if (r.ok) {
+      const data = await r.json();
+      agents.value = data.agents ?? [];
+    }
+  } catch { /* fall through to WS */ }
+
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new ReconnectingWS(`${proto}://${location.host}/ws/wall`, {
     onMessage: data => {
