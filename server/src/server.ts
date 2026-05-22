@@ -11,6 +11,7 @@ import { registerSlashRoutes } from './routes/api.slash.js';
 import { registerPtyBridge } from './pty-bridge.js';
 import { registerWallSnapshots } from './wall-snapshots.js';
 import { registerWallWebSocket } from './wall-channel.js';
+import { startAgentStateScanner } from './agent-state-scanner.js';
 import fastifyStatic from '@fastify/static';
 import * as path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -40,6 +41,7 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   await registerPtyBridge(app);
   registerWallWebSocket(app);
   registerWallSnapshots(app);
+  startAgentStateScanner(app);
 
   const webDist = path.resolve(__dirname, '../../web/dist');
   if (existsSync(webDist)) {
