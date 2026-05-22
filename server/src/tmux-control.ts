@@ -82,7 +82,7 @@ export class TmuxControl {
   async listAllPanes(): Promise<Array<{
     session: string; windowId: string; windowIndex: number; windowName: string;
     id: string; index: number; active: boolean; size: string;
-    cmd: string; path: string; inMode: boolean;
+    cmd: string; path: string; inMode: boolean; panePid: number;
   }>> {
     const { stdout } = await this.run(cmd.listAllPanes());
     return stdout.trim().split('\n').filter(Boolean).map(cmd.parseAllPanesLine);

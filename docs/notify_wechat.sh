@@ -120,11 +120,11 @@ if [ -n "$TMUX_PANE" ]; then
       tool_input=$(echo "$json_input" | jq -c '.tool_input // {}')
       last_msg=$(echo "$tool_input" | jq -r '.questions[0].question // ""' | head -c 80 | tr '\n' ' ')
     fi
+    # 只上报 server 拿不到的三个字段(state=request|stop + lastMessage);
+    # paneId/session/windowId/cwd/claudeSessionId/claudeSessionName/windowName 全由 server scanner 填(读 tmux + ~/.claude/sessions/).
     payload=$(jq -n \
-      --arg pid "$TMUX_PANE" --arg sess "$TMUX_S" --arg wid "$TMUX_W" \
-      --arg csid "$session_id" --arg csname "$session_name" \
-      --arg cwd "$cwd" --arg st "$agent_state" --arg msg "$last_msg" \
-      '{paneId:$pid, session:$sess, windowId:$wid, claudeSessionId:$csid, claudeSessionName:$csname, cwd:$cwd, state:$st, lastMessage:$msg}')
+      --arg pid "$TMUX_PANE" --arg st "$agent_state" --arg msg "$last_msg" \
+      '{paneId:$pid, state:$st, lastMessage:$msg}')
     # 同步等 POST 返回再继续。--max-time 2 兜底:server 挂了/网络差最长卡 2s。
     curl -sX POST "$TMUX_AGENT_URL/api/agent-state" \
       -H 'content-type: application/json' \
