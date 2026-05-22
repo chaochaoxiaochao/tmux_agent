@@ -9,7 +9,8 @@ import { registerUploadRoutes } from './routes/api.upload.js';
 import { registerDebugRoutes } from './routes/api.debug.js';
 import { registerSlashRoutes } from './routes/api.slash.js';
 import { registerPtyBridge } from './pty-bridge.js';
-import { registerWallChannel } from './wall-snapshots.js';
+import { registerWallSnapshots } from './wall-snapshots.js';
+import { registerWallWebSocket } from './wall-channel.js';
 import fastifyStatic from '@fastify/static';
 import * as path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -37,7 +38,8 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   await registerDebugRoutes(app);
   registerSlashRoutes(app);
   await registerPtyBridge(app);
-  registerWallChannel(app);
+  registerWallWebSocket(app);
+  registerWallSnapshots(app);
 
   const webDist = path.resolve(__dirname, '../../web/dist');
   if (existsSync(webDist)) {

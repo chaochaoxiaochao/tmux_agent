@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { evaluateStatus, WindowStatus } from './status-rules.js';
 import { getAttention, AttentionKind } from './attention.js';
+import { broadcast, hasSubscribers, onFirstSubscribe, onAllUnsubscribed } from './wall-channel.js';
 
 export interface WallWindow {
   session: string;
@@ -17,10 +18,9 @@ export interface WallSession {
 }
 export interface WallSnapshot { ts: number; sessions: WallSession[] }
 
-export function registerWallChannel(app: FastifyInstance) {
-  const subscribers = new Set<any>();
+export function registerWallSnapshots(app: FastifyInstance) {
   let timer: NodeJS.Timeout | null = null;
-  const lastSeen = new Map<string, { hash: string; ts: number }>();   // key = "session:windowId"
+  const lastSeen = new Map<string, { hash: string; ts: number }>();
 
   async function tick() {
     const start = Date.now();
@@ -54,20 +54,17 @@ export function registerWallChannel(app: FastifyInstance) {
     } catch {
       snap = { ts: Date.now(), sessions: [] };
     }
-    const payload = JSON.stringify({ type: 'snapshot', payload: snap });
-    for (const s of subscribers) { try { s.send(payload); } catch { /* dead */ } }
+    broadcast({ type: 'snapshot', payload: snap });
     const elapsed = Date.now() - start;
     const next = elapsed > 1500 ? 2500 : 1000;
-    if (subscribers.size > 0) timer = setTimeout(tick, next);
+    if (hasSubscribers()) timer = setTimeout(tick, next);
     else timer = null;
   }
 
-  app.get('/ws/wall', { websocket: true } as any, (conn) => {
-    subscribers.add(conn);
+  onFirstSubscribe(() => {
     if (!timer) timer = setTimeout(tick, 0);
-    conn.on('close', () => {
-      subscribers.delete(conn);
-      if (subscribers.size === 0 && timer) { clearTimeout(timer); timer = null; }
-    });
+  });
+  onAllUnsubscribed(() => {
+    if (timer) { clearTimeout(timer); timer = null; }
   });
 }
