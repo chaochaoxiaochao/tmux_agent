@@ -4,6 +4,24 @@
   --accent: #9bd28b; --warn: #e8b86d; --err: #d97766;
 }
 * { box-sizing: border-box; }
+
+/* Disable iOS long-press callout (copy/select/magnifier/share menu) site-wide.
+ * Inputs/textarea opt back in below so IME long-press behavior (cursor magnifier,
+ * select-word, paste menu) keeps working in the message composer.
+ * Prevents the share-sheet / "open page" iOS popup when users hold buttons
+ * (PaneStrip pane tabs, header bar, ScrollControls, AttachedComposer chips,
+ * WindowWall tiles). */
+html, body, #app, .app-root {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+input, textarea, [contenteditable="true"] {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 html, body, #app { height: 100dvh; width: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px system-ui, -apple-system, sans-serif; touch-action: manipulation; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 .app-root { display: flex; flex-direction: column; height: 100dvh; }
 button { background: var(--bg-alt); color: var(--ink); border: 1px solid var(--ink-faint); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
