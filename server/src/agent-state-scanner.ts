@@ -11,10 +11,15 @@ function mapScannerState(status: string): AgentState {
 }
 
 // 综合 hook 状态(existing.state)和 scanner 观察到的真实状态(scannerState),决定最终 state。
-// - request 永不衰减,scanner 不覆盖
-// - done 10min 内保留;超过 10min 由 scanner 状态接管(通常变 idle)
-// - 其他 (running / idle) 直接跟随 scanner
+// - scanner 看到 claude 进程 busy 时直接覆盖 done/request:
+//     · 父 Agent 派 subagent 触发 Stop hook 后仍在跑 → 不卡死在 "已完成"
+//     · 用户批准/拒绝 PermissionRequest 后 claude 继续 busy → 不卡死在 "等输入"
+//   .status 字段是 claude 自己秒级更新的 ground truth,比 hook 边界事件更可靠。
+// - scanner 看到 idle 时,hook 设的 request/done 仍然保留:
+//     · request 不衰减,等下一个 hook 事件改写
+//     · done 10min 内保留;超过 10min 由 scanner 状态接管(通常变 idle)
 function reconcileState(existingState: AgentState | undefined, existingTs: number | undefined, scannerState: AgentState, now: number): AgentState {
+  if (scannerState === 'running') return 'running';
   if (existingState === 'request') return 'request';
   if (existingState === 'done') {
     const age = existingTs ? now - existingTs : Infinity;
