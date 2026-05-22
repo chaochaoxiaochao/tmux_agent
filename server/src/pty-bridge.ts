@@ -40,11 +40,30 @@ export async function registerPtyBridge(app: FastifyInstance) {
 
     let killFallback: NodeJS.Timeout | null = null;
 
+    // Fetch slash list for `cwd` and push immediate + revalidate frames.
+    // Used by both the initial prewarm and the non-claude → claude edge
+    // hook below.
+    const pushSlashList = async (cwd: string): Promise<void> => {
+      try {
+        const r = await getSlashList(cwd);
+        try { conn.send(JSON.stringify({ type: 'slash-menu-list', items: r.immediate })); } catch { /* dead */ }
+        if (r.revalidating) {
+          r.revalidating.then(items => {
+            try { conn.send(JSON.stringify({ type: 'slash-menu-list', items })); } catch { }
+          }).catch(() => undefined);
+        }
+      } catch {
+        // getSlashList swallows SDK errors → []. Outer throw only happens on
+        // truly exceptional paths; ignore and let next edge retry.
+      }
+    };
+
     const paneMetaPusher = new PaneMetaPusher(
       app.tmux,
       session,
       id,
       (frame) => { try { conn.send(JSON.stringify(frame)); } catch { /* dead */ } },
+      (cwd) => { void pushSlashList(cwd); },
     );
     register(session, id, paneMetaPusher);
     paneMetaPusher.start();
@@ -86,28 +105,20 @@ export async function registerPtyBridge(app: FastifyInstance) {
 
     // ----- Slash list prewarm (SDK route) -----
     // 进 attached view 时如果 active pane 是 claude, 拉 slash list 推前端。
-    // stale-while-revalidate: 过期先返旧, 后台刷, 完成再推第二帧。
+    // 如果不是 claude, 推空 list 覆盖前端 cache; 之后 pusher 检测到 cmd 边沿
+    // 变成 claude 时会自动调 pushSlashList 重拉。
     setTimeout(async () => {
       try {
         const panes = await app.tmux.listPanes(session, id);
         const active = panes.find(p => p.active);
         if (active?.cmd !== 'claude') {
-          // 显式推空 list 覆盖前端 cache (跨 window 复用 composer 时防止上一份残留)
           try { conn.send(JSON.stringify({ type: 'slash-menu-list', items: [] })); } catch { /* dead */ }
           return;
         }
         const cwd = active.path || process.env.HOME || '/';
-        const r = await getSlashList(cwd);
-        try {
-          conn.send(JSON.stringify({ type: 'slash-menu-list', items: r.immediate }));
-        } catch { /* dead */ }
-        if (r.revalidating) {
-          r.revalidating.then(items => {
-            try { conn.send(JSON.stringify({ type: 'slash-menu-list', items })); } catch { }
-          }).catch(() => undefined);
-        }
+        await pushSlashList(cwd);
       } catch {
-        // listPanes 失败 / SDK 失败 → 不推 list, 前端 cache 空, 可接受
+        // listPanes 失败 → 不推 list, 前端 cache 空, 可接受
       }
     }, PREWARM_DELAY_MS);
   });

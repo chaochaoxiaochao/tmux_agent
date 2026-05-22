@@ -7,12 +7,19 @@ export class PaneMetaPusher {
   private lastSerialized: string | null = null;
   private disposed = false;
   private pushing = false;
+  // Last seen cmd of the active pane. Used to detect non-claude → claude edges
+  // so a freshly-started claude inside an already-attached pane triggers a
+  // slash list refresh. null = no observation yet (bootstrap).
+  private lastActiveCmd: string | null = null;
 
   constructor(
     private tmux: TmuxControl,
     private session: string,
     private windowId: string,
     private send: (frame: object) => void,
+    // Fired when active pane cmd transitions to 'claude'. Receives the active
+    // pane's cwd so the caller can fetch and push a fresh slash list.
+    private onClaudeAppeared?: (cwd: string) => void,
   ) {}
 
   start(): void {
@@ -53,6 +60,25 @@ export class PaneMetaPusher {
       return;
     }
     if (this.disposed) return;
+
+    // Detect non-claude → claude edge on the active pane. Fires once per
+    // transition; the lastActiveCmd update below covers both the no-active
+    // case (null) and ordinary cmd changes, so we won't re-fire while it
+    // stays 'claude'. Bootstrap (lastActiveCmd === null) does NOT fire —
+    // pty-bridge's own prewarm covers initial fetch.
+    const active = panes.find(p => p.active);
+    const activeCmd = active?.cmd ?? null;
+    if (
+      this.lastActiveCmd !== null &&
+      this.lastActiveCmd !== 'claude' &&
+      activeCmd === 'claude' &&
+      this.onClaudeAppeared
+    ) {
+      const cwd = active?.path || process.env.HOME || '/';
+      try { this.onClaudeAppeared(cwd); } catch { /* caller's problem */ }
+    }
+    this.lastActiveCmd = activeCmd;
+
     const frame = {
       type: 'pane-meta' as const,
       session: this.session,

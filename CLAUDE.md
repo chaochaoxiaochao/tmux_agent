@@ -8,6 +8,7 @@
 |---------|-------------|
 | `npm run build` | 全量构建 web + server (顶层 workspace 命令) |
 | `cd web && npm run build` | 只构建前端 (改 .vue / 前端 .ts 后必跑, 浏览器还要强刷) |
+| `npm test` | 跑 server unit 测试 (vitest, web 无测试) |
 | `systemctl --user restart tmux-agent` | 重启服务 (改完代码 + build 后跑这条生效) |
 | `systemctl --user status tmux-agent` | 看服务状态 |
 | `journalctl --user -u tmux-agent -f` | 实时日志 |
@@ -22,7 +23,7 @@ tmux_agent/
     routes/             # REST + WS endpoints (api.windows / api.upload / api.completion / api.notify / api.debug / api.slash)
     tmux-control.ts     # 通过 tmux 命令行 + pipe-pane 跟 tmux 交互 (PaneMeta 含 cwd / cmd / size / active / inMode)
     pty-bridge.ts       # node-pty + WS 桥, 把 tmux pane 字节流推给浏览器 + ws-open 时调 getSlashList 预热 slash list + 绑定 PaneMetaPusher
-    pane-meta-{pusher,registry}.ts  # 每 WS 连接 1 个 PaneMetaPusher (2s 嗅探 + diff push, pushing 互斥锁); REST handler 通过 pane-meta-registry.pushNow(session,windowId) 触发立即推; 注册表按 (session,windowId) → Set<pusher> 广播到所有连同一 window 的 WS
+    pane-meta-{pusher,registry}.ts  # 每 WS 连接 1 个 PaneMetaPusher (2s 嗅探 + diff push, pushing 互斥锁); 检测 active pane cmd 非claude→claude 边沿触发 onClaudeAppeared 回调 (slash list 重拉); REST handler 通过 pane-meta-registry.pushNow(session,windowId) 触发立即推; 注册表按 (session,windowId) → Set<pusher> 广播到所有连同一 window 的 WS
     upload-gc.ts        # 后台 GC, 删 ~/.local/share/tmux-agent/uploads/ 下 7 天未访问文件
     slash-{types,builtin,sdk,cache}.ts  # composer / 补全 = Claude Agent SDK init message 拿 list + cwd-keyed cache + 8 内置写死合并
   web/src/
@@ -45,11 +46,15 @@ tmux_agent/
 
 - **改前端必须 `npm run build` + 浏览器强刷** —— vite 产物 hash 化, 不强刷拿不到新版本。systemd 重启服务**不**触发前端重新构建。
 
+- **service 文件必须有 `KillMode=process`,否则 restart 会带走所有 tmux 会话** —— 不写时 systemd 默认 `KillMode=control-group`,stop 时把 cgroup 里所有进程 SIGTERM。问题在于:tmux server 一旦由 tmux-agent fork 出来(socket 不存在时 `tmux attach-session` 会顺手起 server),就继承 service cgroup → 下次 restart **一锅端 tmux server + 所有 pane 内的 claude / bash / mcp 子进程**。`KillMode=process` 让 stop 只杀 node 主进程,tmux server 和 pane 内进程全活,restart 后新 node 重新 attach。`scripts/install-systemd.sh` 生成的 unit 已包含这行 — 手改 unit 时不要漏。改完跑 `systemctl --user daemon-reload` 才生效。日志里看到 `Found left-over process ... in control group while starting unit. Ignoring.` = 正常,是 KillMode=process 生效的证据。
+
 - **手机端禁键盘弹起** —— xterm 的 `.xterm-helper-textarea` 在触屏要 `tabIndex=-1` + `readOnly=true` + `inputMode='none'` 三件套, 单独 `tabIndex=-1` 拦不住点击 focus。见 `context/experience/general/xterm-touch-block-keyboard.md`。
 
 - **手机端 Enter 语义** —— AttachedComposer 在 `isTouchDevice` 时 Enter = 换行 (textarea 原生), 桌面才是 Enter = send + Shift+Enter = 换行。手机系统输入法的"换行键"发的就是 Enter, 拦了等于断了换行能力。见 `context/experience/general/mobile-textarea-enter-isnt-send.md`。
 
 - **`/` 补全 = Claude Agent SDK `q.supportedCommands()`** —— `slash-sdk.ts:fetchSlashList()` 用**永挂 async iterable** 作 prompt 让 SDK 进 streaming-input 模式但**永不 yield** 用户消息, 然后调 `q.supportedCommands()` 走控制协议从 SDK 初始化状态读 slash 列表 — 0 token、0 Anthropic round-trip、0 Stop hook 触发、~1s 完成。SlashCommand 自带 `description` 所以 SlashMenuItem 的 `desc` 也填充了。⚠️ **不要回退到 `prompt:'x' + for await...break` 那种"假装 abort 在 init 后阻止 prompt 送达"的写法** — AbortController 触发太晚, prompt 仍跑完一整轮 turn, 每次烧 ~25k cache_creation + 5 output tokens + 触发 Stop hook 推一条无链接的企微通知(因为 SDK 子进程没 TMUX_PANE)。server `slash-cache.ts` 用 pane cwd 作 key + 10 分钟 TTL + stale-while-revalidate;前端 composer cache 收 `slash-menu-list` WS 帧填充, 用户打 `/` 走前端 startsWith 过滤,点 🔄 button(header banner)强刷。8 个内置(`/clear /compact /cost /help /resume /agents /model /config`)写死在 `slash-builtin.ts` 与 SDK 返回合并,SDK 优先 dedup。配置 `~/.config/tmux-agent/config.yaml` 的 `commands:` 段已彻底废除。详见 `context/experience/general/claude-agent-sdk-init-message-for-slash-list.md` 和 `context/experience/project/tmux_agent/pty-bytes-not-screen-snapshot.md`(为什么没走 PTY 字节流路)。
+
+- **slash list 重拉靠 PaneMetaPusher 的 cmd 边沿检测,不是定时轮询** —— ws-open 时 prewarm 拉一次。之后由 `pane-meta-pusher.ts` 每 2s 嗅探 active pane 时检测 `lastActiveCmd !== 'claude' && activeCmd === 'claude'` 边沿,触发一次 `pushSlashList(cwd)`。覆盖场景:用户进 ws 时 pane 是 bash,**之后在 pane 里手敲 `claude` 起新实例** → 2s 内自动拉 list 推前端。稳态(claude 一直跑)**不触发**,所以不会每 2s 刷。Bootstrap(`lastActiveCmd === null`)显式跳过,由 pty-bridge prewarm 负责。即使误触发也走 `slash-cache.ts` 的 10 分钟 TTL,不会重打 SDK。要加新的"特定 pane 状态变化触发动作"时复用这个边沿模式,**不要**加独立轮询。
 
 - **`ReconnectingWS.onMessage` 收到的文本帧是已 `JSON.parse` 的 object, 不是 raw string** —— `web/src/ws.ts` 在 callback 上游就 parse 了。新增 WS frame consumer 时判断要写 `typeof data === 'object'` + `data.type === '...'`,不是 `typeof === 'string'` + `JSON.parse(data)`。坑过 c7fd078,详见 `context/experience/project/tmux_agent/ws-onmessage-receives-parsed-object.md`。
 

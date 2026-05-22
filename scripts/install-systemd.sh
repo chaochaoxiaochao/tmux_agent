@@ -20,6 +20,11 @@ WorkingDirectory=$ROOT
 ExecStart=$NODE_BIN $ROOT/server/dist/main.js
 Restart=on-failure
 RestartSec=2
+# Only kill node main process on stop/restart. Without this, systemd default
+# KillMode=control-group SIGTERMs the whole cgroup — including the tmux server
+# (if tmux-agent fork'd it when no socket existed) and every claude/bash/mcp
+# process inside the panes. See CLAUDE.md "KillMode=process" gotcha.
+KillMode=process
 
 [Install]
 WantedBy=default.target
