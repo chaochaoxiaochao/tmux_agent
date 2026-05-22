@@ -101,7 +101,44 @@ fi
 LINK_LINE=""
 [ -n "$DEEP_LINK" ] && LINK_LINE="\n>[👉 打开 Web 终端]($DEEP_LINK)"
 
-CONTENT="## $HEAD\n${BODY}${LINK_LINE}"
+TIME_LINE="\n>Time: \`$(date '+%Y-%m-%d:%H-%M-%S')\`"
+
+# 拉全 agent 快照,按状态分组渲染到正文下半段。
+# 失败 / endpoint 404 / 空 registry → AGENTS_SECTION 留空,CONTENT 退化到原样。
+AGENTS_SECTION=""
+snapshot=$(curl -s --max-time 2 "$TMUX_AGENT_URL/api/agent-state/snapshot" 2>/dev/null)
+if [ -n "$snapshot" ]; then
+  rendered=$(echo "$snapshot" | jq -r --arg public "$PUBLIC_URL" --arg curpid "$TMUX_PANE" '
+    if (.agents | length) == 0 then ""
+    else
+      .agents
+      | group_by(.state)
+      | map({state: .[0].state, items: .})
+      | sort_by(if .state == "request" then 0 elif .state == "running" then 1 else 2 end)
+      | map(
+          (if .state == "request" then "⏳ 等输入 (" + (.items | length | tostring) + ")"
+            elif .state == "running" then "🟢 跑着 (" + (.items | length | tostring) + ")"
+            else "✅ 刚完成 (" + (.items | length | tostring) + ")" end) as $header
+          | ["**" + $header + "**"] + (.items | map(
+              "- [" + .session + ":" + .windowId + "#" + (.paneIndex | tostring) + "](" + $public + "/#/w/" + (.session | @uri) + "/" + (.windowId | @uri) + ") · " +
+              (((now - (.lastEventAt / 1000)) | floor | tostring) + "s") +
+              " · `" + (.cwd | split("/") | .[-2:] | join("/")) + "`" +
+              (if (.lastMessage // "") != "" then " · \"" + .lastMessage + "\"" else "" end) +
+              (if .paneId == $curpid then " ← 本次" else "" end)
+            ))
+        )
+      | flatten
+      | join("\n")
+    end
+  ' 2>/dev/null)
+  if [ -n "$rendered" ]; then
+    # 每行前面加 > 让企微 markdown 把整段当 quote 显示
+    quoted=$(printf '%s' "$rendered" | sed 's/^/>/')
+    AGENTS_SECTION=$'\n>\n>────── 当前所有 agents ──────\n'"$quoted"
+  fi
+fi
+
+CONTENT="## $HEAD\n${BODY}${TIME_LINE}${LINK_LINE}${AGENTS_SECTION}"
 
 # 上报 agent state 到 tmux-agent registry (供 wall agent view 实时显示)。
 # 失败静默,后台跑不阻塞 hook chain。
