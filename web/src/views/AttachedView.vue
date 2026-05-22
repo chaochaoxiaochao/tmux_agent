@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import XtermPane from '../components/XtermPane.vue';
 import ScrollControls from '../components/ScrollControls.vue';
 import AttachedComposer from '../components/AttachedComposer.vue';
@@ -228,9 +228,27 @@ async function onEnter() {
     ).catch(() => { /* best effort */ });
   }
   api.ensureZoomed(props.session, props.id).catch(() => { /* best effort */ });
+  // Prime panes from REST so initial active/inMode are correct even before
+  // the first pane-meta WS frame arrives. Also fixes iOS Safari background-tab
+  // missing a pane-meta delta — refetched on visibilitychange below.
+  refreshPanes();
 }
 
-onMounted(onEnter);
+async function refreshPanes() {
+  try {
+    panes.value = await api.panes(props.session, props.id);
+  } catch { /* best effort */ }
+}
+
+const onVisible = () => { if (document.visibilityState === 'visible') refreshPanes(); };
+
+onMounted(() => {
+  onEnter();
+  document.addEventListener('visibilitychange', onVisible);
+});
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', onVisible);
+});
 watch(() => [props.session, props.id, props.pane], onEnter);
 </script>
 
