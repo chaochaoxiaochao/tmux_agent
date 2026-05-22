@@ -103,6 +103,34 @@ LINK_LINE=""
 
 CONTENT="## $HEAD\n${BODY}${LINK_LINE}"
 
+# 上报 agent state 到 tmux-agent registry (供 wall agent view 实时显示)。
+# 失败静默,后台跑不阻塞 hook chain。
+if [ -n "$TMUX_PANE" ]; then
+  case "$hook_event_name" in
+    Stop) agent_state="stop" ;;
+    PermissionRequest|Notification) agent_state="request" ;;
+    *) agent_state="" ;;
+  esac
+  if [ -n "$agent_state" ]; then
+    # last_msg ≤80 字。Stop / Notification 走 $message;
+    # AskUserQuestion 的问题在 tool_input.questions[0].question;其他 PermissionRequest 都没合适字段,留空。
+    last_msg=""
+    if [ -n "$message" ] && [ "$message" != "null" ]; then
+      last_msg=$(printf '%s' "$message" | head -c 80 | tr '\n' ' ')
+    elif [ "$tool_name" = "AskUserQuestion" ]; then
+      tool_input=$(echo "$json_input" | jq -c '.tool_input // {}')
+      last_msg=$(echo "$tool_input" | jq -r '.questions[0].question // ""' | head -c 80 | tr '\n' ' ')
+    fi
+    payload=$(jq -n \
+      --arg pid "$TMUX_PANE" --arg sess "$TMUX_S" --arg wid "$TMUX_W" \
+      --arg csid "$session_id" --arg cwd "$cwd" --arg st "$agent_state" --arg msg "$last_msg" \
+      '{paneId:$pid, session:$sess, windowId:$wid, claudeSessionId:$csid, cwd:$cwd, state:$st, lastMessage:$msg}')
+    curl -sX POST "$TMUX_AGENT_URL/api/agent-state" \
+      -H 'content-type: application/json' \
+      --max-time 2 -d "$payload" > /dev/null 2>&1 &
+  fi
+fi
+
 curl -s -X POST "$WECOM_WEBHOOK" \
   -H "Content-Type: application/json" \
   -d "$(jq -n --arg c "$(printf '%b' "$CONTENT")" '{msgtype:"markdown", markdown:{content:$c}}')" \
