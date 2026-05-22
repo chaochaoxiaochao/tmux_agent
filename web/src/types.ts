@@ -38,3 +38,22 @@ export interface PaneMetaFrame {
   windowId: string;
   panes: PaneMetaItem[];
 }
+export type AgentState = 'running' | 'request' | 'stop';
+
+export interface AgentEntry {
+  paneId: string;
+  session: string;
+  windowId: string;
+  windowIndex: number;
+  paneIndex: number;
+  claudeSessionId?: string;
+  cwd: string;
+  state: AgentState;
+  lastEventAt: number;
+  lastMessage?: string;
+}
+
+export interface AgentStateFrame {
+  type: 'agent-state';
+  agents: AgentEntry[];
+}
