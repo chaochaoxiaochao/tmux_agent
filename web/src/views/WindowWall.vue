@@ -1,5 +1,9 @@
 <template>
   <div class="wall">
+    <header class="bar">
+      <button class="active" disabled>tile</button>
+      <button @click="$router.push('/agent')">🤖 agent</button>
+    </header>
     <div v-if="status !== 'open'" class="status-banner">● {{ status }}</div>
     <div v-if="snap && snap.sessions.length === 0" class="empty">
       <p>no tmux sessions</p>
@@ -159,6 +163,16 @@ function humanAge(ms: number): string {
 .wall { padding: 16px; box-sizing: border-box; }
 @media (max-width: 600px) { .wall { padding: 8px; } }
 .status-banner { color: var(--warn); font-size: 12px; margin-bottom: 8px; }
+
+.bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #222; background: var(--bg-alt); }
+.bar button {
+  font: 13px ui-monospace, monospace;
+  padding: 4px 12px; border-radius: 4px;
+  background: transparent; border: 1px solid var(--ink-faint); color: var(--ink-dim);
+  cursor: pointer;
+}
+.bar button.active { background: var(--accent); color: #000; border-color: var(--accent); cursor: default; }
+.bar button:hover:not(.active):not(:disabled) { border-color: var(--accent); color: var(--ink); }
 
 .session { margin-bottom: 22px; }
 .session-header {
