@@ -122,8 +122,9 @@ if [ -n "$TMUX_PANE" ]; then
     fi
     payload=$(jq -n \
       --arg pid "$TMUX_PANE" --arg sess "$TMUX_S" --arg wid "$TMUX_W" \
-      --arg csid "$session_id" --arg cwd "$cwd" --arg st "$agent_state" --arg msg "$last_msg" \
-      '{paneId:$pid, session:$sess, windowId:$wid, claudeSessionId:$csid, cwd:$cwd, state:$st, lastMessage:$msg}')
+      --arg csid "$session_id" --arg csname "$session_name" \
+      --arg cwd "$cwd" --arg st "$agent_state" --arg msg "$last_msg" \
+      '{paneId:$pid, session:$sess, windowId:$wid, claudeSessionId:$csid, claudeSessionName:$csname, cwd:$cwd, state:$st, lastMessage:$msg}')
     # 同步等 POST 返回再继续。--max-time 2 兜底:server 挂了/网络差最长卡 2s。
     curl -sX POST "$TMUX_AGENT_URL/api/agent-state" \
       -H 'content-type: application/json' \
@@ -148,9 +149,13 @@ if [ -n "$snapshot" ]; then
             elif .state == "running" then "🟢 跑着 (" + (.items | length | tostring) + ")"
             else "✅ 刚完成 (" + (.items | length | tostring) + ")" end) as $header
           | ["**" + $header + "**"] + (.items | map(
-              "- [" + .session + ":" + (if (.windowName // "") != "" then .windowName else .windowId end) + "#" + (.paneIndex | tostring) + "](" + $public + "/#/w/" + (.session | @uri) + "/" + (.windowId | @uri) + ") · " +
-              (((now - (.lastEventAt / 1000)) | floor | tostring) + "s") +
-              " · `" + (.cwd | split("/") | .[-2:] | join("/")) + "`" +
+              ((.claudeSessionName // "") as $name
+                | (.claudeSessionId // "") as $id
+                | if $name != "" then $name elif $id != "" then ($id[0:8]) else "" end) as $clabel
+              | "- [" + .session + ":" + (if (.windowName // "") != "" then .windowName else .windowId end) + "#" + (.paneIndex | tostring) + "](" + $public + "/#/w/" + (.session | @uri) + "/" + (.windowId | @uri) + ")" +
+              (if $clabel != "" then " · `" + $clabel + "`" else "" end) +
+              " · " + ((.lastEventAt / 1000) | strflocaltime("%H:%M:%S")) +
+              " · `" + .cwd + "`" +
               (if (.lastMessage // "") != "" then " · \"" + .lastMessage + "\"" else "" end) +
               (if .paneId == $curpid then " ← 本次" else "" end)
             ))

@@ -15,10 +15,11 @@
         <div class="line1">
           <span class="state">{{ stateIcon(a.state) }}</span>
           <span class="addr">{{ a.session }}:{{ a.windowName || a.windowId }}#{{ a.paneIndex }}</span>
-          <span class="age">{{ formatAge(a.lastEventAt) }}</span>
+          <span v-if="claudeLabel(a)" class="sname">{{ claudeLabel(a) }}</span>
+          <span class="age">{{ formatTime(a.lastEventAt) }}</span>
         </div>
         <div class="line2">
-          <span class="cwd">{{ shortCwd(a.cwd) }}</span>
+          <span class="cwd">{{ a.cwd }}</span>
           <template v-if="a.lastMessage">
             <span class="sep">·</span>
             <span class="msg">{{ a.lastMessage }}</span>
@@ -50,18 +51,15 @@ function stateIcon(s: AgentState): string {
   return s === 'running' ? '▶' : s === 'request' ? '⏳' : '✅';
 }
 
-function shortCwd(cwd: string): string {
-  if (!cwd) return '';
-  const parts = cwd.split('/').filter(Boolean);
-  return '.../' + parts.slice(-2).join('/');
+function claudeLabel(a: AgentEntry): string {
+  if (a.claudeSessionName) return a.claudeSessionName;
+  if (a.claudeSessionId) return a.claudeSessionId.slice(0, 8);
+  return '';
 }
 
-function formatAge(ts: number): string {
-  const sec = Math.floor((Date.now() - ts) / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m`;
-  return `${Math.floor(min / 60)}h`;
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString('en-GB', { hour12: false });
 }
 
 function goAttached(a: AgentEntry) {
@@ -115,8 +113,9 @@ onUnmounted(() => ws?.close());
 .row:hover { background: #1c1c1c; }
 .line1 { display: flex; align-items: baseline; gap: 8px; font: 13px ui-monospace, monospace; }
 .line1 .state { font-size: 14px; }
-.line1 .addr { color: var(--ink); font-weight: 600; flex: 1; min-width: 0; }
-.line1 .age  { color: var(--ink-faint); font-size: 11px; }
+.line1 .addr { color: var(--ink); font-weight: 600; flex-shrink: 0; }
+.line1 .sname { color: var(--accent); font-size: 11px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.line1 .age  { color: var(--ink-faint); font-size: 11px; margin-left: auto; flex-shrink: 0; }
 .line2 {
   margin-top: 4px;
   font: 12px ui-monospace, monospace;

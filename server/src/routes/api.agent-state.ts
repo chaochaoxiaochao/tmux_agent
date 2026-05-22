@@ -6,6 +6,7 @@ interface AgentReportBody {
   session?: string;
   windowId?: string;
   claudeSessionId?: string;
+  claudeSessionName?: string;
   cwd?: string;
   state: AgentState;
   lastMessage?: string;
@@ -27,6 +28,7 @@ export function registerAgentStateRoutes(app: FastifyInstance): void {
       session: b.session,
       windowId: b.windowId,
       claudeSessionId: b.claudeSessionId,
+      claudeSessionName: b.claudeSessionName,
       cwd: b.cwd,
       state: b.state,
       lastMessage: b.lastMessage,

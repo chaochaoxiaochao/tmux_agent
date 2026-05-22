@@ -10,6 +10,7 @@ export interface AgentEntry {
   windowName?: string;
   paneIndex: number;
   claudeSessionId?: string;
+  claudeSessionName?: string;
   cwd: string;
   state: AgentState;
   lastEventAt: number;
@@ -37,6 +38,7 @@ export function upsert(partial: Partial<AgentEntry> & { paneId: string }): void 
     windowName: partial.windowName ?? existing?.windowName,
     paneIndex: partial.paneIndex ?? existing?.paneIndex ?? 0,
     claudeSessionId: partial.claudeSessionId ?? existing?.claudeSessionId,
+    claudeSessionName: partial.claudeSessionName ?? existing?.claudeSessionName,
     cwd: partial.cwd ?? existing?.cwd ?? '',
     state: partial.state ?? existing?.state ?? 'running',
     lastEventAt: partial.lastEventAt ?? existing?.lastEventAt ?? Date.now(),
@@ -55,6 +57,7 @@ function sameEntry(a: AgentEntry, b: AgentEntry): boolean {
     && a.windowName === b.windowName
     && a.paneIndex === b.paneIndex
     && a.claudeSessionId === b.claudeSessionId
+    && a.claudeSessionName === b.claudeSessionName
     && a.cwd === b.cwd
     && a.state === b.state
     && a.lastMessage === b.lastMessage;

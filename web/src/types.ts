@@ -48,6 +48,7 @@ export interface AgentEntry {
   windowName?: string;
   paneIndex: number;
   claudeSessionId?: string;
+  claudeSessionName?: string;
   cwd: string;
   state: AgentState;
   lastEventAt: number;
