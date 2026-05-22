@@ -36,16 +36,6 @@ cwd=$(echo "$json_input" | jq -r '.cwd')
 hook_event_name=$(echo "$json_input" | jq -r '.hook_event_name')
 notification_type=$(echo "$json_input" | jq -r '.notification_type // ""')
 tool_name=$(echo "$json_input" | jq -r '.tool_name // ""')
-parent_tool_use_id=$(echo "$json_input" | jq -r '.parent_tool_use_id // ""')
-
-# Subagent Stop 也会触发本 hook (父 agent 的 Task 工具内部完成时)。subagent
-# 完成不是用户关心的"任务做完了" —— 它只是父 agent 的一个内部步骤;真正
-# 要通知的是父 agent 的最外层 Stop。parent_tool_use_id 非空 = 这是 subagent
-# stop, 直接退出, 不发通知也不上报 agent state (state 应由父 agent 自己的
-# Stop/PermissionRequest 维护)。
-if [ "$hook_event_name" = "Stop" ] && [ -n "$parent_tool_use_id" ]; then
-  exit 0
-fi
 
 # 本脚本设计支持 3 类事件,对应 settings.json 里的 3 个 hook 入口:
 #   - Stop              + matcher=""    (Claude 每个 turn 结束)
