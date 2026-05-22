@@ -111,8 +111,11 @@ onBeforeUnmount(() => { stopRepeat(); });
 .scrollctl {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 4px 6px 4px 16px;
-  border-top: 1px solid #222;
+  border-top: 2px solid #333;
   background: var(--bg-alt);
+  /* 视觉分离:让 tmux status bar / 终端最后一行跟控制条之间有明确空隙 + 边线,
+     不再"贴脸"显得像被遮挡。 */
+  margin-top: 4px;
 }
 .left {
   display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
