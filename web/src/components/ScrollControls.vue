@@ -118,12 +118,19 @@ onBeforeUnmount(() => { stopRepeat(); });
   margin-top: 4px;
 }
 .left {
-  display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  display: flex; gap: 4px; flex-wrap: nowrap; align-items: center;
   flex: 1; min-width: 0;
+  /* 窄屏时按钮总宽超过 .left 可用宽度,改成横向滚动而不是折行,
+     保证 ScrollControls 高度恒定 = d-pad 高度,不会挤压终端区。 */
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
+.left::-webkit-scrollbar { height: 3px; }
+.left::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 2px; }
 .scrollctl button {
   font: 12px ui-monospace, monospace;
   padding: 5px 10px; min-width: 40px;
+  flex-shrink: 0;
   /* All buttons in this strip suppress the mobile long-press callout
      (select / copy / magnifier). Only the d-pad arrows and PgUp/PgDn
      actually act on press-and-hold (auto-repeat); everywhere else a
