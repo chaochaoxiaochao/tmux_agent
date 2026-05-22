@@ -65,6 +65,12 @@ tmux_agent/
 
 - **tmux 状态有 pane / session / client 三层 scope** —— `pane_in_mode` / `pane_current_command` / cwd 是 pane 级 (全 client 共享, 一个 client 让 pane 进 copy-mode 所有 client 都看到), `select-window` 影响 session 级 active window (跨 client 互相切窗口), 各 client 的 viewport size / 焦点是 client 级。设计任何调 tmux 命令的 RPC / WS 帧时先想清楚 scope, 想要 per-client 隔离 (如让 web 端切 window 不影响电脑直接 attach 的那个 client) 要走 `tmux new-session -t orig -s derived` 派生 grouped session。详见 `context/experience/project/tmux_agent/tmux-state-scope-per-client-vs-shared.md`。
 
+- **agent-state 真相源是 `~/.claude/sessions/<pid>.json`,不是 hook 推送** —— scanner 每 5s tick 时通过 `tmux pane_pid → ps -p <pid> -o comm= 或 pgrep -P <pid> -x claude → claude 子进程 pid → ~/.claude/sessions/<claude_pid>.json` 拿 `{sessionId, name, status: busy|idle, cwd, updatedAt}`。claude 进程实时维护这个文件,`/rename` 设的 name 5s 内可见,无需 hook 触发。实现见 `server/src/claude-session-resolver.ts`。详见 `context/experience/project/tmux_agent/claude-sessions-json-as-realtime-state.md`。
+
+- **AgentState 4 个值各有唯一写入者 + 调和规则** —— `running` / `idle` 由 scanner 写(跟随 `~/.claude/sessions/.status`),`request` 由 hook 写(PermissionRequest / AskUserQuestion,永不衰减),`done` 由 hook 写(Stop 事件,10 分钟后被 scanner 退化到 idle)。改 AgentView 或 registry 前看 `server/src/agent-state-scanner.ts` 的 `reconcileState`,别让 scanner 覆盖 hook 设的事件性状态;hook 也别去写 running/idle 这种 scanner 才知道的字段。
+
+- **hook POST `/api/agent-state` body 只 3 字段** —— `paneId / state / lastMessage`。其他字段(`session / windowId / cwd / claudeSessionId / claudeSessionName / windowName`)全由 server scanner 主动填,hook 不要重新加回去 —— 会跟 scanner 抢字段,且 hook 拿到的可能比 scanner 旧。
+
 ## Hook 安装 / 修改流程
 
 WeChat 通知 hook 三件套:
