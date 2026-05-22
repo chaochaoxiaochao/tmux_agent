@@ -72,70 +72,38 @@ server:
 1. 对应 wall tile 黄/蓝闪烁（进 attached view 自动清）
 2. 推一条企微消息，带「打开 Web 终端」可点链接
 
-原理：3 类 hook event 调用同一个 bash 脚本，脚本根据 event + tool_name 分别推送不同文案 —— 同时 POST `/api/notify` 给 tmux-agent + POST 企微 webhook。
+原理:hook event 调用同一个 bash 脚本,脚本根据 event + tool_name 分别推送不同文案 —— 同时 POST `/api/notify` 给 tmux-agent + POST 企微 webhook。
 
 | Event | matcher | 何时触发 | 微信文案 |
 |---|---|---|---|
 | `Stop` | `""` (全匹配) | 每个 turn 结束 | ✅ 主人我完成任务了 |
-| `PermissionRequest` | `.*` | Claude 主动问问题(`AskUserQuestion`) **或** Edit/Bash 等工具权限审批弹窗 | ❓ 主人我需要问你 / 🔐 主人我需要你批准 X 操作（按 `tool_name` 分） |
-| `Notification` | `permission_prompt` | 内置工具 notification（实际很少触发，备用） | 🔔 等输入 |
-
-⚠️ **不要**再单独加 `PreToolUse + AskUserQuestion` —— `PermissionRequest` 已经覆盖 `AskUserQuestion`，再加会**同一次 ask 收两条微信**（去重坑）。
+| `PermissionRequest` | `.*` | Claude 主动问问题(`AskUserQuestion`) **或** Edit/Bash 等工具权限审批弹窗 | ❓ 主人我需要问你 / 🔐 主人我需要你批准 X 操作(按 `tool_name` 分) |
 
 **步骤**
 
-1. config.yaml 加 `server.publicUrl: http://<your-host-ip>:7681`（VPN 网卡 IP / 内网 IP），改完 `systemctl --user restart tmux-agent`
-2. `~/.claude/settings.json` 注册 hook：
+1. config.yaml 加 `server.publicUrl: http://<your-host-ip>:7681`(VPN 网卡 IP / 内网 IP),改完 `systemctl --user restart tmux-agent`
 
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "bash ~/.claude/hooks/notify_wechat.sh" }
-        ]
-      }
-    ],
-    "PermissionRequest": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          { "type": "command", "command": "bash ~/.claude/hooks/notify_wechat.sh" },
-          { "type": "command", "command": "printf '\\a'" }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "permission_prompt",
-        "hooks": [
-          { "type": "command", "command": "bash ~/.claude/hooks/notify_wechat.sh" },
-          { "type": "command", "command": "printf '\\a'" }
-        ]
-      }
-    ]
-  }
-}
-```
+2. 拿一个企微群机器人 webhook URL —— 群设置 → 群机器人 → 添加 → 复制 Webhook 地址,形如 `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...`
 
-注意:
-- `PermissionRequest` 才是 Claude Code **实际处理"需要用户决定"**(AskUserQuestion + 工具权限审批)的事件,**不要**用 `Notification permission_prompt` 替代,后者实际只在内置 notification 流程里触发,Edit/Bash 弹 prompt 时不会响。
-- `PermissionRequest matcher=".*"` 同时覆盖 AskUserQuestion 和工具审批两种语义,**不要**再加 `PreToolUse + AskUserQuestion`(那会跟 PermissionRequest 重复触发,同一次 ask 收两条微信)。
-- 3 个 event 都指向同一个脚本,脚本内部按 `hook_event_name + tool_name` 分文案。
-
-3. 拷一份 hook 脚本到 `~/.claude/hooks/notify_wechat.sh` 并 `chmod +x`，模板见 [docs/notify_wechat.sh](docs/notify_wechat.sh)：
+3. 一键安装(需要 `jq`):
 
    ```bash
-   cp docs/notify_wechat.sh ~/.claude/hooks/
-   chmod +x ~/.claude/hooks/notify_wechat.sh
+   ./scripts/install-wechat-hook.sh https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
    ```
 
-4. **拿一个企微机器人 webhook URL** —— 这是必填的，不配的话啥消息都收不到：
-   - 企业微信群 → 群设置 → 群机器人 → 添加机器人 → 创建后复制 Webhook 地址
-   - 形如 `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxxxx-...`
-   - 打开 `~/.claude/hooks/notify_wechat.sh`，把第 65 行附近的 `WECOM_WEBHOOK="https://...key=xxxx..."` 改成你刚拿到的 URL
+   脚本做这三件事:
+   - 把 `docs/notify_wechat.sh` 拷贝到 `~/.claude/hooks/notify_wechat.sh`(chmod +x)
+   - 把 URL 写到 `~/.claude/hooks/notify_wechat.env`(chmod 600;脚本运行时 source 这个 env,**不再**改硬编码 URL)
+   - 用 jq 幂等注册到 `~/.claude/settings.json` 的 `Stop` + `PermissionRequest` 两个 hook 点
+
+   重跑脚本:URL 不传时复用现有 `.env`,所以**改 hook 逻辑后只需直接重跑,不用重输 URL**。换 URL 就传新值。
+
+   ⚠️ 别直接改 `~/.claude/hooks/notify_wechat.sh` —— 那是产物,下次重装会覆盖。要改逻辑改 repo 里的 `docs/notify_wechat.sh` 再重跑 install。
+
+**为什么注册的是 `Stop` + `PermissionRequest` 这两个 event**
+
+- `PermissionRequest matcher=".*"` 同时覆盖 AskUserQuestion 和 Edit/Bash 工具审批两种语义。**不要**再加 `PreToolUse + AskUserQuestion`,会跟 PermissionRequest 重复触发,同一次 ask 收两条微信。
+- `Notification permission_prompt` 实际只在内置 notification 流程里触发,Edit/Bash 弹 prompt 时不会响,所以 install 脚本**没**注册它 —— 留它在历史文档里只是为了说明"不要去配它"。
 
 **调试**
 
