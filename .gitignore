@@ -19,3 +19,6 @@ extracted/
 web/src/**/*.vue.js
 web/src/**/*.js
 web/tsconfig.tsbuildinfo
+
+# Hook secrets — never commit
+*.env
