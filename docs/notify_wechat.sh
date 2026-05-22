@@ -152,7 +152,7 @@ if [ -n "$snapshot" ]; then
               ((.claudeSessionName // "") as $name
                 | (.claudeSessionId // "") as $id
                 | if $name != "" then $name elif $id != "" then ($id[0:8]) else "" end) as $clabel
-              | "- [" + .session + ":" + (if (.windowName // "") != "" then .windowName else .windowId end) + "#" + (.paneIndex | tostring) + "](" + $public + "/#/w/" + (.session | @uri) + "/" + (.windowId | @uri) + ")" +
+              | "- [" + .session + ":" + (if (.windowName // "") != "" then .windowName else .windowId end) + "#" + (.paneIndex | tostring) + "](" + $public + "/#/w/" + (.session | @uri) + "/" + (.windowId | @uri) + "/" + (.paneId | @uri) + ")" +
               (if $clabel != "" then " · `" + $clabel + "`" else "" end) +
               " · " + ((.lastEventAt / 1000) | strflocaltime("%H:%M:%S")) +
               " · `" + .cwd + "`" +

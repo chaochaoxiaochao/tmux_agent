@@ -78,7 +78,8 @@ function formatTime(ts: number): string {
 }
 
 function goAttached(a: AgentEntry) {
-  router.push(`/w/${encodeURIComponent(a.session)}/${encodeURIComponent(a.windowId)}`);
+  // 带 paneId 跳路由,AttachedView 进去后会主动把它设为 active(否则默认显示 window 当前 active pane,可能不是 claude)。
+  router.push(`/w/${encodeURIComponent(a.session)}/${encodeURIComponent(a.windowId)}/${encodeURIComponent(a.paneId)}`);
 }
 
 let ws: ReconnectingWS | null = null;

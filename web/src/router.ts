@@ -8,6 +8,6 @@ export const router = createRouter({
   routes: [
     { path: '/', component: WindowWall },
     { path: '/agent', component: AgentView },
-    { path: '/w/:session/:id', component: AttachedView, props: true },
+    { path: '/w/:session/:id/:pane?', component: AttachedView, props: true },
   ],
 });

@@ -63,7 +63,7 @@ import PaneStrip from '../components/PaneStrip.vue';
 import { api } from '../api';
 import type { SlashMenuItem, PaneMetaFrame, PaneMetaItem } from '../types';
 
-const props = defineProps<{ session: string; id: string }>();
+const props = defineProps<{ session: string; id: string; pane?: string }>();
 const pendingFiles = ref<File[]>([]);
 const dragActive = ref(false);
 let dragDepth = 0;
@@ -219,11 +219,19 @@ function hasFiles(e: DragEvent): boolean {
 //    window_zoomed_flag and only toggles when needed — idempotent.
 async function onEnter() {
   api.clearAttention(props.session, props.id).catch(() => { /* best effort */ });
+  // 路由参数带 pane 时,先把那个 pane 设成 active(支持 AgentView / 企微 deep link 精确定位到 claude pane);
+  // 不带 pane 就维持 window 自己的 active pane。
+  if (props.pane) {
+    fetch(
+      `/api/sessions/${encodeURIComponent(props.session)}/windows/${encodeURIComponent(props.id)}/panes/${encodeURIComponent(props.pane)}/select`,
+      { method: 'POST' },
+    ).catch(() => { /* best effort */ });
+  }
   api.ensureZoomed(props.session, props.id).catch(() => { /* best effort */ });
 }
 
 onMounted(onEnter);
-watch(() => [props.session, props.id], onEnter);
+watch(() => [props.session, props.id, props.pane], onEnter);
 </script>
 
 <style scoped>
