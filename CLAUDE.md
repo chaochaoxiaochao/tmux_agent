@@ -64,3 +64,19 @@ tmux_agent/
 - **ScrollControls 的 copy-mode 状态由 AttachedView 下发** —— pane-meta-ws-push task 后, `ScrollControls.inCopyMode` 不再是本地 ref, 是 `AttachedView` 计算的 `activePane?.inMode ?? false` prop。要加新的"跟随 copy-mode 状态显隐 / 禁用"按钮, 从 ScrollControls 的 props 拿, 不要在该组件里自建 ref 跟踪。`toggleHistory` 也不写本地状态, 调 REST 后等 server 推 pane-meta 帧回来更新 prop。
 
 - **tmux 状态有 pane / session / client 三层 scope** —— `pane_in_mode` / `pane_current_command` / cwd 是 pane 级 (全 client 共享, 一个 client 让 pane 进 copy-mode 所有 client 都看到), `select-window` 影响 session 级 active window (跨 client 互相切窗口), 各 client 的 viewport size / 焦点是 client 级。设计任何调 tmux 命令的 RPC / WS 帧时先想清楚 scope, 想要 per-client 隔离 (如让 web 端切 window 不影响电脑直接 attach 的那个 client) 要走 `tmux new-session -t orig -s derived` 派生 grouped session。详见 `context/experience/project/tmux_agent/tmux-state-scope-per-client-vs-shared.md`。
+
+## Hook 安装 / 修改流程
+
+WeChat 通知 hook 三件套:
+
+- `docs/notify_wechat.sh` — repo 副本(源真相)
+- `scripts/install-wechat-hook.sh` — 一键安装/更新
+- `~/.claude/hooks/notify_wechat.env` — 用户私有 webhook URL(gitignore,不入 repo)
+
+**首次安装**:`./scripts/install-wechat-hook.sh https://qyapi.weixin.qq.com/...`
+
+**修改 hook 逻辑**:改 `docs/notify_wechat.sh` → 重跑 install 脚本(URL 会从已有 .env 复用,无需重输)→ commit `docs/notify_wechat.sh` 改动
+
+**只换 webhook URL**:重跑 install 脚本传新 URL
+
+⚠️ 不要直接改 `~/.claude/hooks/notify_wechat.sh` —— 那是 install 脚本的产物,下次重装会覆盖。改 `docs/` 才是源。
