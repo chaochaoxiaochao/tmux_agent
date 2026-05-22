@@ -79,6 +79,17 @@ export class TmuxControl {
     } catch { return []; }
   }
 
+  async listAllPanes(): Promise<Array<{
+    session: string; windowId: string; windowIndex: number;
+    id: string; index: number; active: boolean; size: string;
+    cmd: string; path: string; inMode: boolean;
+  }>> {
+    try {
+      const { stdout } = await this.run(cmd.listAllPanes());
+      return stdout.trim().split('\n').filter(Boolean).map(cmd.parseAllPanesLine);
+    } catch { return []; }
+  }
+
   async selectPane(session: string, windowId: string, paneId: string): Promise<void> {
     await this.run(cmd.selectPane(session, windowId, paneId));
   }
