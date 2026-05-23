@@ -34,7 +34,7 @@
         @pane-meta="onPaneMeta"
       /></div>
     </div>
-    <ScrollControls :session="session" :window-id="id" :in-copy-mode="activePane?.inMode ?? false" />
+    <ScrollControls :session="session" :window-id="id" :in-copy-mode="activePane?.inMode ?? false" :active-cmd="activePane?.cmd ?? ''" />
     <AttachedComposer
       ref="composer"
       :session="session"

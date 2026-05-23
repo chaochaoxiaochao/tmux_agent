@@ -25,6 +25,17 @@
       <button @click="key('Escape')" title="Escape">Esc</button>
       <button class="danger" @click="key('C-c')"    title="Ctrl-C">^C</button>
       <button class="accent" @click="key('Enter')"  title="Enter">⏎</button>
+      <span class="sep"></span>
+      <button
+        :disabled="props.activeCmd === 'claude'"
+        @click="reply('claude\n')"
+        :title="props.activeCmd === 'claude' ? 'Already in claude' : 'Start a new claude session (`claude` + Enter)'"
+      >new</button>
+      <button
+        :disabled="props.activeCmd === 'claude'"
+        @click="reply('claude -c\n')"
+        :title="props.activeCmd === 'claude' ? 'Already in claude' : 'Resume last claude session (`claude -c` + Enter)'"
+      >resume</button>
     </div>
     <div class="dpad" @contextmenu.prevent>
       <button class="b-up"
@@ -55,7 +66,7 @@
 import { onBeforeUnmount, watch } from 'vue';
 import { api } from '../api';
 
-const props = defineProps<{ session: string; windowId: string; inCopyMode: boolean }>();
+const props = defineProps<{ session: string; windowId: string; inCopyMode: boolean; activeCmd: string }>();
 
 async function toggleHistory() {
   try {
