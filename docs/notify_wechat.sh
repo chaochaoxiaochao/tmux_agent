@@ -37,6 +37,19 @@ hook_event_name=$(echo "$json_input" | jq -r '.hook_event_name')
 notification_type=$(echo "$json_input" | jq -r '.notification_type // ""')
 tool_name=$(echo "$json_input" | jq -r '.tool_name // ""')
 
+# Stop event payload 带 background_tasks 数组,父 agent 主动结束 turn 但
+# 还有 subagent 在后台跑时,各 task 的 .status == "running"。这一刻的 Stop
+# 不算"真正完成" —— 用户语义上的"全做完了"应该是最后那个 background task
+# 也结束时的 Stop。所以:Stop event 且有 running 的 background task -> 跳过
+# 通知 + 跳过 agent-state 更新,等后台清空后那次 Stop 再触发。
+# PermissionRequest 不受影响 (等输入仍需推送)。
+if [ "$hook_event_name" = "Stop" ]; then
+  running_bg=$(echo "$json_input" | jq -r '[.background_tasks[]? | select(.status=="running")] | length')
+  if [ "$running_bg" -gt 0 ]; then
+    exit 0
+  fi
+fi
+
 # 本脚本设计支持 3 类事件,对应 settings.json 里的 3 个 hook 入口:
 #   - Stop              + matcher=""    (Claude 每个 turn 结束)
 #   - PermissionRequest + matcher=".*"  (Claude Code 实际处理"需要用户决定"的事件;
