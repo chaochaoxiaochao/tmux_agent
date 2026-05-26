@@ -51,6 +51,8 @@ function buttonToCardAction(b: Button): any {
   return base;
 }
 
+// Headline emoji prefixes must stay in sync with src/notify/render.ts; if you
+// add a new event headline there, add its color here or it falls back to grey.
 function pickHeaderColor(headline: string): string {
   if (headline.startsWith('✅')) return 'green';
   if (headline.startsWith('🔐')) return 'orange';
