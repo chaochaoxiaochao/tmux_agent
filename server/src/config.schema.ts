@@ -5,10 +5,24 @@ export interface Config {
   buttons: Button[];
   statusRules: StatusRule[];
   log: { level: 'debug' | 'info' | 'warn' | 'error'; file: string };
+  notify: NotifyConfig;
 }
 
 export interface Button { id: string; label: string; payload: string }
 export interface StatusRule { match: string; status: 'ok' | 'warn' | 'err' }
+
+export interface NotifyConfig {
+  channels: {
+    wecom: { enabled: boolean; webhook_url_env: string };
+    lark: {
+      enabled: boolean;
+      app_id: string;
+      app_secret_env: string;
+      owner_open_id: string;
+      send_target: 'user';
+    };
+  };
+}
 
 export const DEFAULT_CONFIG: Config = {
   server: { host: '0.0.0.0', port: 7681, publicUrl: undefined },
@@ -26,6 +40,18 @@ export const DEFAULT_CONFIG: Config = {
   // (POST /api/notify) drive the WAIT/DONE pulse.
   statusRules: [],
   log: { level: 'info', file: '~/.local/share/tmux-agent/server.log' },
+  notify: {
+    channels: {
+      wecom: { enabled: false, webhook_url_env: 'WECOM_WEBHOOK_URL' },
+      lark: {
+        enabled: false,
+        app_id: '',
+        app_secret_env: 'LARK_APP_SECRET',
+        owner_open_id: '',
+        send_target: 'user',
+      },
+    },
+  },
 };
 
 export function mergeConfig(partial: Partial<Config>): Config {
@@ -36,6 +62,12 @@ export function mergeConfig(partial: Partial<Config>): Config {
     buttons: partial.buttons ?? DEFAULT_CONFIG.buttons,
     statusRules: partial.statusRules ?? DEFAULT_CONFIG.statusRules,
     log: { ...DEFAULT_CONFIG.log, ...(partial.log ?? {}) },
+    notify: {
+      channels: {
+        wecom: { ...DEFAULT_CONFIG.notify.channels.wecom, ...(partial.notify?.channels?.wecom ?? {}) },
+        lark: { ...DEFAULT_CONFIG.notify.channels.lark, ...(partial.notify?.channels?.lark ?? {}) },
+      },
+    },
   };
 }
 
@@ -54,5 +86,16 @@ export function validateConfig(cfg: Config): void {
     if (Buffer.byteLength(b.payload, 'utf8') > 4096) {
       throw new Error(`button ${b.id} payload exceeds 4 KB`);
     }
+  }
+  if (cfg.notify.channels.lark.enabled) {
+    if (!cfg.notify.channels.lark.owner_open_id) {
+      throw new Error('notify.channels.lark.owner_open_id is required when lark.enabled=true');
+    }
+    if (!cfg.notify.channels.lark.app_id) {
+      throw new Error('notify.channels.lark.app_id is required when lark.enabled=true');
+    }
+  }
+  if (cfg.notify.channels.wecom.enabled && !cfg.notify.channels.wecom.webhook_url_env) {
+    throw new Error('notify.channels.wecom.webhook_url_env is required when wecom.enabled=true');
   }
 }
