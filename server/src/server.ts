@@ -37,12 +37,15 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   app.decorate('tmux', tmux);
   app.decorate('cfg', cfg);
 
+  // Integration test fixtures construct cfg without going through mergeConfig,
+  // so cfg.notify may be undefined despite the Config type marking it required.
   const notifyCfg = cfg.notify ?? DEFAULT_CONFIG.notify;
   const channels: Channel[] = [];
   if (notifyCfg.channels.wecom.enabled) channels.push(new WecomChannel(notifyCfg.channels.wecom));
   if (notifyCfg.channels.lark.enabled) channels.push(new LarkChannel(notifyCfg.channels.lark));
   const notifyCenter = new NotificationCenter(channels, { publicUrl: cfg.server.publicUrl });
   await notifyCenter.init();
+  // Decorated for Phase 2 callback routes (lark-router) to access center off app.
   app.decorate('notifyCenter', notifyCenter);
   app.addHook('onClose', async () => { await notifyCenter.shutdown(); });
 
