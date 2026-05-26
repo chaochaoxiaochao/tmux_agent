@@ -78,16 +78,22 @@ tmux_agent/
 
 ## Hook 安装 / 修改流程
 
-WeChat 通知 hook 三件套:
+通知 hook 链路 (server 端 channel fanout, hook 脚本只做 forward):
 
-- `docs/notify_wechat.sh` — repo 副本(源真相)
-- `scripts/install-wechat-hook.sh` — 一键安装/更新
-- `~/.claude/hooks/notify_wechat.env` — 用户私有 webhook URL(gitignore,不入 repo)
+- `docs/notify.sh` — repo 副本(源真相), ~35 行,只 POST 给本地 server
+- `scripts/install-notify-hook.sh` — 一键安装 + 迁移老 wecom hook + 配置 wecom + lark 双通道
+- `~/.claude/hooks/notify.sh` — install 拷贝的产物 (gitignore 范围,不入 repo)
+- `~/.config/tmux-agent/.env` — secret (WECOM_WEBHOOK_URL / LARK_APP_SECRET), chmod 600
+- `~/.config/tmux-agent/config.yaml` notify 段 — 每个 channel 独立 `enabled` 开关
 
-**首次安装**:`./scripts/install-wechat-hook.sh https://qyapi.weixin.qq.com/...`
+**首次安装**:`./scripts/install-notify-hook.sh` (交互式问 wecom URL 和 lark 应用信息)
 
-**修改 hook 逻辑**:改 `docs/notify_wechat.sh` → 重跑 install 脚本(URL 会从已有 .env 复用,无需重输)→ commit `docs/notify_wechat.sh` 改动
+**只换 wecom URL**:改 `~/.config/tmux-agent/.env` 的 `WECOM_WEBHOOK_URL` → `systemctl --user restart tmux-agent`
 
-**只换 webhook URL**:重跑 install 脚本传新 URL
+**修改 hook 逻辑**:改 `docs/notify.sh` → 重跑 install 脚本 → commit `docs/notify.sh` 改动
 
-⚠️ 不要直接改 `~/.claude/hooks/notify_wechat.sh` —— 那是 install 脚本的产物,下次重装会覆盖。改 `docs/` 才是源。
+⚠️ 不要直接改 `~/.claude/hooks/notify.sh` —— install 脚本会覆盖。改 `docs/` 才是源。
+
+⚠️ Phase 1 阶段 lark 默认 disable;启用走 Phase 2 (按钮回调) 之后再开。
+
+老脚本 `docs/notify_wechat.sh` 和 `scripts/install-wechat-hook.sh` 保留在 repo (git 历史) 但已停用。install-notify-hook.sh 会把 `~/.claude/hooks/notify_wechat.sh` 备份到 `.bak`,清掉 settings.json 里指向它的 hook entry。
