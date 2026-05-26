@@ -1,6 +1,7 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { TmuxControl } from './tmux-control.js';
 import type { Config } from './config.schema.js';
+import { DEFAULT_CONFIG } from './config.schema.js';
 import { registerWindowsRoutes } from './routes/api.windows.js';
 import { registerButtonsRoutes } from './routes/api.buttons.js';
 import { registerCompletionRoutes } from './routes/api.completion.js';
@@ -13,6 +14,10 @@ import { registerWallSnapshots } from './wall-snapshots.js';
 import { registerWallWebSocket } from './wall-channel.js';
 import { startAgentStateScanner } from './agent-state-scanner.js';
 import { registerAgentStateRoutes } from './routes/api.agent-state.js';
+import { NotificationCenter } from './notify/center.js';
+import { WecomChannel } from './notify/channel-wecom.js';
+import { LarkChannel } from './notify/channel-lark.js';
+import type { Channel } from './notify/types.js';
 import fastifyStatic from '@fastify/static';
 import * as path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -32,10 +37,19 @@ export async function buildServer(cfg: ExtendedConfig): Promise<FastifyInstance>
   app.decorate('tmux', tmux);
   app.decorate('cfg', cfg);
 
+  const notifyCfg = cfg.notify ?? DEFAULT_CONFIG.notify;
+  const channels: Channel[] = [];
+  if (notifyCfg.channels.wecom.enabled) channels.push(new WecomChannel(notifyCfg.channels.wecom));
+  if (notifyCfg.channels.lark.enabled) channels.push(new LarkChannel(notifyCfg.channels.lark));
+  const notifyCenter = new NotificationCenter(channels, { publicUrl: cfg.server.publicUrl });
+  await notifyCenter.init();
+  app.decorate('notifyCenter', notifyCenter);
+  app.addHook('onClose', async () => { await notifyCenter.shutdown(); });
+
   await registerWindowsRoutes(app);
   registerButtonsRoutes(app);
   registerCompletionRoutes(app);
-  registerNotifyRoutes(app);
+  registerNotifyRoutes(app, notifyCenter);
   await registerUploadRoutes(app);
   await registerDebugRoutes(app);
   registerSlashRoutes(app);
@@ -62,5 +76,6 @@ declare module 'fastify' {
   interface FastifyInstance {
     tmux: TmuxControl;
     cfg: ExtendedConfig;
+    notifyCenter: NotificationCenter;
   }
 }
