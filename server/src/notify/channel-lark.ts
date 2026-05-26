@@ -6,6 +6,7 @@ import { buildLarkCard } from './lark-card.js';
 export class LarkChannel implements Channel {
   readonly kind = 'lark' as const;
   enabled: boolean;
+  // protected so Phase 2 subclass (WS + EventDispatcher) can reuse client/cfg.
   protected client?: lark.Client;
 
   constructor(protected cfg: NotifyConfig['channels']['lark']) {
