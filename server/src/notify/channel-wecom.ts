@@ -32,7 +32,7 @@ export class WecomChannel implements Channel {
         body: JSON.stringify({ msgtype: 'markdown', markdown: { content } }),
       });
     } catch (e) {
-      // swallow: 不影响其他 channel
+      console.error('[wecom] send failed:', (e as Error).message);
     }
   }
 

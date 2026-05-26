@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WecomChannel } from '../../../src/notify/channel-wecom.js';
 import type { RichNotification } from '../../../src/notify/types.js';
 
@@ -10,6 +10,7 @@ const sample: RichNotification = {
 
 describe('WecomChannel', () => {
   beforeEach(() => { process.env.WECOM_WEBHOOK_URL = 'https://qy.example/hook'; });
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it('send POSTs markdown payload to webhook', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve('') });
