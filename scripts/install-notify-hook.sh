@@ -36,12 +36,21 @@ cp "$TEMPLATE" "$HOOK_SH"
 chmod +x "$HOOK_SH"
 echo "[ok] hook: $HOOK_SH"
 
+# upsert KEY="value" 到 env 文件 (剔除老行再追加新行,re-run 不会堆重复).
+upsert_env() {
+  local key="$1" val="$2" file="$3"
+  touch "$file"
+  grep -v "^$key=" "$file" > "$file.tmp" || true
+  echo "$key=\"$val\"" >> "$file.tmp"
+  mv "$file.tmp" "$file"
+}
+
 # --- 4. 配置 wecom (可选) ---
 echo
 read -rp "Enable WeCom (企业微信) channel? [y/N] " ans
 if [[ "$ans" =~ ^[Yy] ]]; then
   read -rp "  WeCom webhook URL: " WECOM_URL
-  echo "WECOM_WEBHOOK_URL=\"$WECOM_URL\"" >> "$TMUX_ENV"
+  upsert_env WECOM_WEBHOOK_URL "$WECOM_URL" "$TMUX_ENV"
   WECOM_ENABLED=true
 else
   WECOM_ENABLED=false
@@ -56,7 +65,7 @@ if [[ "$ans" =~ ^[Yy] ]]; then
   read -rp "  Lark app_id (cli_xxxx): " LARK_APP_ID
   read -rsp "  Lark app_secret: " LARK_APP_SECRET; echo
   read -rp "  Owner open_id (ou_xxxx, 谁收消息): " LARK_OWNER
-  echo "LARK_APP_SECRET=\"$LARK_APP_SECRET\"" >> "$TMUX_ENV"
+  upsert_env LARK_APP_SECRET "$LARK_APP_SECRET" "$TMUX_ENV"
   LARK_ENABLED=true
 else
   LARK_ENABLED=false
@@ -97,9 +106,12 @@ jq --arg cmd "bash $HOOK_SH" '
   .hooks //= {} |
   .hooks.Stop //= [] |
   .hooks.PermissionRequest //= [] |
-  # 先清掉老 notify_wechat.sh entry
-  .hooks.Stop |= map(select(.hooks[]?.command | test("notify_wechat.sh") | not)) |
-  .hooks.PermissionRequest |= map(select(.hooks[]?.command | test("notify_wechat.sh") | not)) |
+  # 细粒度: 在每个 entry 的 .hooks 子数组里剔掉 notify_wechat.sh 命令,
+  # 但保留兄弟命令 (如 printf "\\a" 响铃). 子数组空了再删 entry.
+  (.hooks.Stop, .hooks.PermissionRequest) |= (
+    map(.hooks |= map(select(.command | test("notify_wechat.sh") | not)))
+    | map(select(.hooks | length > 0))
+  ) |
   # 注册新 entry (幂等)
   (if (.hooks.Stop | map(select(.hooks[]?.command == $cmd)) | length) == 0
    then .hooks.Stop += [{"matcher":"", "hooks":[{"type":"command","command":$cmd}]}]
