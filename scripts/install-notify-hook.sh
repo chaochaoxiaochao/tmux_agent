@@ -62,8 +62,8 @@ else
   LARK_ENABLED=false
 fi
 
-chmod 600 "$TMUX_ENV"
-echo "[ok] secrets: $TMUX_ENV"
+[ -f "$TMUX_ENV" ] && chmod 600 "$TMUX_ENV"
+[ -f "$TMUX_ENV" ] && echo "[ok] secrets: $TMUX_ENV"
 
 # --- 6. 写 config.yaml notify 段 (幂等) ---
 python3 - "$TMUX_CFG" "$WECOM_ENABLED" "$LARK_ENABLED" "${LARK_APP_ID:-}" "${LARK_OWNER:-}" <<'PY'
