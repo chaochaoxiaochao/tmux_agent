@@ -122,7 +122,16 @@ jq --arg cmd "bash $HOOK_SH" '
 ' "$SETTINGS" > "$TMP" && mv "$TMP" "$SETTINGS"
 echo "[ok] settings: $SETTINGS"
 
-# --- 8. 提示 restart ---
+# --- 8. 给已安装的 systemd unit 加 EnvironmentFile (幂等) ---
+UNIT="$HOME/.config/systemd/user/tmux-agent.service"
+if [ -f "$UNIT" ] && ! grep -q "^EnvironmentFile=-\?%h/.config/tmux-agent/\.env" "$UNIT"; then
+  # 在 [Service] 段第一行后插入 EnvironmentFile
+  sed -i '/^\[Service\]/a EnvironmentFile=-%h/.config/tmux-agent/.env' "$UNIT"
+  systemctl --user daemon-reload
+  echo "[ok] patched unit with EnvironmentFile: $UNIT"
+fi
+
+# --- 9. 提示 restart ---
 echo
 echo "Done. Restart tmux-agent for config changes:"
 echo "  systemctl --user restart tmux-agent"

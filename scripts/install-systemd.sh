@@ -17,6 +17,9 @@ After=default.target
 [Service]
 Type=simple
 WorkingDirectory=$ROOT
+# Load secrets (wecom webhook, lark app_secret) populated by install-notify-hook.sh.
+# Leading '-' = optional; if the file is missing systemd won't refuse to start.
+EnvironmentFile=-%h/.config/tmux-agent/.env
 ExecStart=$NODE_BIN $ROOT/server/dist/main.js
 Restart=on-failure
 RestartSec=2
