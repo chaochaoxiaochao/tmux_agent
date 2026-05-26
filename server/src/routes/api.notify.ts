@@ -9,6 +9,11 @@ export function registerNotifyRoutes(app: FastifyInstance, center?: Notification
 
     // 新契约: hook 发的结构化 payload
     if (typeof body.hook_event_name === 'string') {
+      const validKinds = ['Stop', 'PermissionRequest', 'Notification'] as const;
+      if (!validKinds.includes(body.hook_event_name)) {
+        reply.status(400).send({ error: 'bad_input', message: 'unknown hook_event_name' });
+        return;
+      }
       const ev: NotifyEvent = {
         paneId: body.paneId ?? '',
         session: body.session ?? '',
@@ -29,6 +34,8 @@ export function registerNotifyRoutes(app: FastifyInstance, center?: Notification
       // 2) fanout 到 channels
       if (center) {
         await center.dispatch(ev);
+      } else {
+        req.log.warn({ hook_event_name: ev.hook_event_name }, 'notify center not wired; structured payload dropped');
       }
       reply.status(204).send();
       return;
