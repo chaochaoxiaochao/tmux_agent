@@ -1,12 +1,66 @@
 import type { NotifyEvent, RichNotification, Button } from './types.js';
+import { snapshot, type AgentEntry } from '../agent-state-registry.js';
 
 export interface RenderOpts { eventId: string; publicUrl?: string }
 
+const STATE_ORDER: Record<string, number> = { request: 0, running: 1, done: 2 };
+const STATE_HEADER: Record<string, string> = {
+  request: '⏳ 等输入',
+  running: '🟢 跑着',
+  done: '✅ 刚完成',
+};
+
+// 老 hook (notify_wechat.sh.bak) 按 state 分组渲染 agents 列表。这里用 TS 重写
+// 等价逻辑,失败时返回 undefined,channel 渲染会跳过该段不退化主体。
+export function renderAgentsSection(agents: AgentEntry[], curPaneId: string, publicUrl?: string): string | undefined {
+  if (agents.length === 0) return undefined;
+  const groups = new Map<string, AgentEntry[]>();
+  for (const a of agents) {
+    const arr = groups.get(a.state) ?? [];
+    arr.push(a);
+    groups.set(a.state, arr);
+  }
+  const sortedStates = [...groups.keys()].sort(
+    (a, b) => (STATE_ORDER[a] ?? 3) - (STATE_ORDER[b] ?? 3),
+  );
+  const lines: string[] = [];
+  for (const state of sortedStates) {
+    const items = groups.get(state)!;
+    const header = STATE_HEADER[state] ?? `💤 ${state}`;
+    lines.push(`**${header} (${items.length})**`);
+    for (const a of items) {
+      const clabel = a.claudeSessionName?.trim() || a.claudeSessionId?.slice(0, 8) || '';
+      const winLabel = a.windowName?.trim() || a.windowId;
+      const time = new Date(a.lastEventAt).toLocaleTimeString();
+      const here = a.paneId === curPaneId ? ' ← 本次' : '';
+      const linkPart = publicUrl
+        ? `[${a.session}:${winLabel}#${a.paneIndex}](${publicUrl}/#/w/${encodeURIComponent(a.session)}/${encodeURIComponent(a.windowId)}/${encodeURIComponent(a.paneId)})`
+        : `${a.session}:${winLabel}#${a.paneIndex}`;
+      const cwdPart = a.cwd ? ` · \`${a.cwd}\`` : '';
+      const msgPart = a.lastMessage ? ` · "${a.lastMessage}"` : '';
+      const cPart = clabel ? ` · \`${clabel}\`` : '';
+      lines.push(`- ${linkPart}${cPart} · ${time}${cwdPart}${msgPart}${here}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+// 反查 session 标签: claudeSessionName (用户 /rename 的) > cwd 末段 > session 字段.
+function sessionLabel(ev: NotifyEvent, agents: AgentEntry[]): string {
+  const mine = agents.find(a => a.paneId === ev.paneId);
+  if (mine?.claudeSessionName) return mine.claudeSessionName;
+  const tail = ev.cwd?.split('/').filter(Boolean).pop();
+  return tail || ev.session || '?';
+}
+
 export function renderNotification(ev: NotifyEvent, opts: RenderOpts): RichNotification {
+  const agents = (() => { try { return snapshot(); } catch { return []; } })();
+  const sLabel = sessionLabel(ev, agents);
+
   let headline: string;
   let body: string;
   const fields = [
-    { label: 'Session', value: ev.session },
+    { label: 'Session', value: sLabel },
     { label: 'Cwd', value: ev.cwd },
     { label: 'Time', value: new Date().toLocaleString() },
   ];
@@ -37,9 +91,17 @@ export function renderNotification(ev: NotifyEvent, opts: RenderOpts): RichNotif
     buttons.push({ text: '🔗 打开 Web', style: 'default', kind: 'link', url: deepLink });
   }
 
+  let agentsSnapshot: string | undefined;
+  try {
+    const section = renderAgentsSection(agents, ev.paneId, opts.publicUrl);
+    if (section) agentsSnapshot = `────── 当前所有 agents ──────\n${section}`;
+  } catch {
+    // 静默: agents 段失败不影响主体
+  }
+
   return {
     headline, body, fields,
-    deepLink, buttons,
+    deepLink, buttons, agentsSnapshot,
     eventId: opts.eventId,
     paneId: ev.paneId, session: ev.session, windowId: ev.windowId,
   };

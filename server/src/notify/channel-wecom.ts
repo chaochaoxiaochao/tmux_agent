@@ -22,7 +22,11 @@ export class WecomChannel implements Channel {
     lines.push(n.body);
     for (const f of n.fields) lines.push(`>${f.label}: \`${f.value}\``);
     if (n.deepLink) lines.push(`>[👉 打开 Web](${n.deepLink})`);
-    if (n.agentsSnapshot) lines.push(n.agentsSnapshot);
+    if (n.agentsSnapshot) {
+      // 企微 markdown 块引用: 每行 '>' 前缀让整段是 quote 样式 (跟老 hook 对齐).
+      const quoted = n.agentsSnapshot.split('\n').map(l => `>${l}`).join('\n');
+      lines.push('>', quoted);
+    }
     const content = lines.join('\n');
 
     try {
