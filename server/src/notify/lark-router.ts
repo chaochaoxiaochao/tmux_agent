@@ -13,10 +13,12 @@ export interface ReplyCard {
 }
 
 export async function handleCardAction(ev: any, ctx: LarkRouterCtx): Promise<ReplyCard | undefined> {
-  const sender = ev?.event?.operator?.open_id;
+  // SDK normalized payload 是顶层结构 (operator / action 在顶层),
+  // 但 webhook 模式 raw 数据有 event 包装. 两层都试一下兼容.
+  const sender = ev?.event?.operator?.open_id ?? ev?.operator?.open_id;
   if (sender !== ctx.ownerOpenId) return undefined; // 静默 drop 非 owner
 
-  const value = ev?.event?.action?.value ?? {};
+  const value = ev?.event?.action?.value ?? ev?.action?.value ?? {};
   const { action, paneId, eventId } = value;
   if (!action || !paneId || !eventId) return undefined;
   const knownActions = ['approve', 'deny', 'cancel', 'text', 'answer'];
