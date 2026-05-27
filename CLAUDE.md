@@ -76,6 +76,8 @@ tmux_agent/
 
 - **hook POST `/api/agent-state` body 只 3 字段** —— `paneId / state / lastMessage`。其他字段(`session / windowId / cwd / claudeSessionId / claudeSessionName / windowName`)全由 server scanner 主动填,hook 不要重新加回去 —— 会跟 scanner 抢字段,且 hook 拿到的可能比 scanner 旧。
 
+- **LarkChannel WS 长连无 SIGTERM 优雅关闭** —— `server/src/main.ts` 没装 `process.on('SIGTERM', () => app.close())`,Fastify v4+ 不再自动装。systemctl restart 走 `KillMode=process`,node 被 SIGTERM 后**不会**经 `app.close()` → `onClose` 不触发 → `WSClient.stop()` 不调用 → 飞书侧短时间(秒级)保留这条 WS session,下次新进程起来时重连。无功能影响,但飞书重连日志会偏多。要彻底干净,在 main.ts 入口加 `process.on('SIGTERM', () => app.close()); process.on('SIGINT', () => app.close());`。
+
 ## Hook 安装 / 修改流程
 
 通知 hook 链路 (server 端 channel fanout, hook 脚本只做 forward):
@@ -93,7 +95,5 @@ tmux_agent/
 **修改 hook 逻辑**:改 `docs/notify.sh` → 重跑 install 脚本 → commit `docs/notify.sh` 改动
 
 ⚠️ 不要直接改 `~/.claude/hooks/notify.sh` —— install 脚本会覆盖。改 `docs/` 才是源。
-
-⚠️ Phase 1 阶段 lark 默认 disable;启用走 Phase 2 (按钮回调) 之后再开。
 
 老脚本 `docs/notify_wechat.sh` 和 `scripts/install-wechat-hook.sh` 保留在 repo (git 历史) 但已停用。install-notify-hook.sh 会把 `~/.claude/hooks/notify_wechat.sh` 备份到 `.bak`,清掉 settings.json 里指向它的 hook entry。
