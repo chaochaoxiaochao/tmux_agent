@@ -3,11 +3,12 @@ import { snapshot, type AgentEntry } from '../agent-state-registry.js';
 
 export interface RenderOpts { eventId: string; publicUrl?: string }
 
-const STATE_ORDER: Record<string, number> = { request: 0, running: 1, done: 2 };
+const STATE_ORDER: Record<string, number> = { request: 0, running: 1, done: 2, idle: 3 };
 const STATE_HEADER: Record<string, string> = {
   request: '⏳ 等输入',
   running: '🟢 跑着',
   done: '✅ 刚完成',
+  idle: '💤 闲着',
 };
 
 // 老 hook (notify_wechat.sh.bak) 按 state 分组渲染 agents 列表。这里用 TS 重写
