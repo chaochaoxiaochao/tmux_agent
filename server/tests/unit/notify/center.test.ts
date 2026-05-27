@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NotificationCenter } from '../../../src/notify/center.js';
 import type { Channel, NotifyEvent } from '../../../src/notify/types.js';
+import { pendingEvents } from '../../../src/notify/pending-events.js';
 
 function fakeChannel(kind: 'wecom' | 'lark', sendImpl: () => Promise<void>): Channel {
   return {
@@ -43,5 +44,25 @@ describe('NotificationCenter', () => {
     await c.dispatch(ev);
     expect((a.send as any).mock.calls.length).toBe(0);
     expect((b.send as any).mock.calls.length).toBe(1);
+  });
+
+  it('dispatch stores AskUserQuestion option labels into pendingEvents', async () => {
+    const sends: any[] = [];
+    const a: Channel = {
+      kind: 'wecom', enabled: true,
+      async init() {},
+      send: vi.fn(async (n) => { sends.push(n); }) as any,
+      async shutdown() {},
+    };
+    const c = new NotificationCenter([a], { publicUrl: 'https://x' });
+    await c.dispatch({
+      ...ev,
+      hook_event_name: 'PermissionRequest',
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions: [{ question: 'q?', options: [{ label: 'YesA' }, { label: 'NoB' }] }] },
+    });
+    const eid = sends[0].eventId;
+    const entry = pendingEvents.get(eid);
+    expect(entry?.options).toEqual(['YesA', 'NoB']);
   });
 });
