@@ -127,6 +127,12 @@ export class TmuxControl {
     }
   }
 
+  async sendKeysToPane(paneId: string, text: string, withEnter: boolean): Promise<void> {
+    // -l = literal, 不解释 keys (避免 "Enter" 字面值被当 key)
+    await this.run(['send-keys', '-t', paneId, '-l', text]);
+    if (withEnter) await this.run(['send-keys', '-t', paneId, 'Enter']);
+  }
+
   async paneCwd(session: string, windowId: string): Promise<string | null> {
     try {
       const { stdout } = await this.run(cmd.displayPaneCwd(session, windowId));
