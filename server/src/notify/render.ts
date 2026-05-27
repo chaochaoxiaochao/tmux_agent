@@ -134,6 +134,7 @@ export function renderNotification(ev: NotifyEvent, opts: RenderOpts): RichNotif
   return {
     headline, body, fields,
     deepLink, buttons, agentsSnapshot, agents: agentRows,
+    inputSlot: true,
     eventId: opts.eventId,
     paneId: ev.paneId, session: ev.session, windowId: ev.windowId,
   };

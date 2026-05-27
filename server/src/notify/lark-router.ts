@@ -21,7 +21,7 @@ export async function handleCardAction(ev: any, ctx: LarkRouterCtx): Promise<Rep
   const value = ev?.event?.action?.value ?? ev?.action?.value ?? {};
   const { action, paneId, eventId } = value;
   if (!action || !paneId || !eventId) return undefined;
-  const knownActions = ['approve', 'deny', 'cancel', 'text', 'answer'];
+  const knownActions = ['approve', 'deny', 'cancel', 'text', 'answer', 'text_input'];
   if (!knownActions.includes(action)) return undefined; // 未知 action 静默丢, 不烧 eventId
 
   const entry = pendingEvents.get(eventId);
@@ -52,6 +52,13 @@ export async function handleCardAction(ev: any, ctx: LarkRouterCtx): Promise<Rep
       const idx = Number(value.option_index ?? -1);
       const text = entry.options?.[idx];
       if (text) await ctx.tmux.sendKeysToPane(paneId, text, true);
+      break;
+    }
+    case 'text_input': {
+      // SDK normalized: form_value 在顶层 action 下; webhook raw: 在 ev.event.action 下.
+      const formText = ev?.action?.form_value?.pane_text ?? ev?.event?.action?.form_value?.pane_text;
+      const t = String(formText ?? '');
+      if (t) await ctx.tmux.sendKeysToPane(paneId, t, true);
       break;
     }
   }

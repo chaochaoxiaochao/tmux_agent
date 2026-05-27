@@ -28,6 +28,33 @@ export function buildLarkCard(n: RichNotification): any {
     elements.push({ tag: 'div', text: { tag: 'lark_md', content: n.agentsSnapshot } });
   }
 
+  // Phase 3: 自由输入文本框 + 发送到 pane 按钮. 放在底部按钮排之前, 让 input
+  // 框出现在快捷按钮上方. schema 2.0 风格 - input 直接是 body.elements 成员;
+  // 发送按钮单独封一个 column_set, 不混进下面的快捷按钮排.
+  if (n.inputSlot) {
+    elements.push({
+      tag: 'input',
+      name: 'pane_text',
+      placeholder: { tag: 'plain_text', content: '直接打字发送到 pane...' },
+    });
+    elements.push({
+      tag: 'column_set',
+      flex_mode: 'none',
+      horizontal_spacing: 'small',
+      columns: [{
+        tag: 'column',
+        width: 'auto',
+        vertical_align: 'top',
+        elements: [{
+          tag: 'button',
+          text: { tag: 'plain_text', content: '📨 发送到 pane' },
+          type: 'primary',
+          value: { action: 'text_input', paneId: n.paneId, eventId: n.eventId },
+        }],
+      }],
+    });
+  }
+
   // schema 2.0: action tag 已废弃, 按钮直接作为 element 或装进 column_set.
   // 用 column_set 让按钮排成一行 (横向多列, 每列 1 个 button).
   if (n.buttons.length > 0) {

@@ -65,6 +65,20 @@ describe('handleCardAction', () => {
     expect(tmuxSpy.sendKeysToPane).toHaveBeenCalledWith('%9', 'NoB', true);
   });
 
+  it('text_input pulls form_value.pane_text and sends to pane', async () => {
+    pendingEvents.set('e_ti', { paneId: '%9' });
+    // SDK-normalized shape (Phase 2 fix): operator/action 顶层, form_value 在 action 里
+    const ev = {
+      operator: { open_id: 'ou_owner' },
+      action: {
+        value: { action: 'text_input', paneId: '%9', eventId: 'e_ti' },
+        form_value: { pane_text: 'hello world' },
+      },
+    };
+    await handleCardAction(ev, ctxBase);
+    expect(tmuxSpy.sendKeysToPane).toHaveBeenCalledWith('%9', 'hello world', true);
+  });
+
   it('repeated click on same eventId returns "已处理过"', async () => {
     pendingEvents.set('e_dup', { paneId: '%9' });
     await handleCardAction(makeEvent('approve', { eventId: 'e_dup' }), ctxBase);

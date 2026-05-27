@@ -44,6 +44,7 @@ export interface RichNotification {
   agents?: AgentRow[];         // 结构化, lark 卡片 table 用
   deepLink?: string;
   buttons: Button[];
+  inputSlot?: boolean;          // Phase 3: 卡片底部 input + 发送到 pane 按钮
   eventId: string;
   paneId: string;
   session: string;
