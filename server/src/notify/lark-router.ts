@@ -19,6 +19,8 @@ export async function handleCardAction(ev: any, ctx: LarkRouterCtx): Promise<Rep
   const value = ev?.event?.action?.value ?? {};
   const { action, paneId, eventId } = value;
   if (!action || !paneId || !eventId) return undefined;
+  const knownActions = ['approve', 'deny', 'cancel', 'text', 'answer'];
+  if (!knownActions.includes(action)) return undefined; // 未知 action 静默丢, 不烧 eventId
 
   const entry = pendingEvents.get(eventId);
   if (!entry) {
