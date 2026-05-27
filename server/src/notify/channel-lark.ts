@@ -65,6 +65,7 @@ export class LarkChannel implements Channel {
     if (this.wsClient) {
       try { await this.wsClient.stop(); }
       catch (e) { console.error('[lark] WS stop failed:', (e as Error).message); }
+      this.wsClient = undefined; // make shutdown idempotent
     }
   }
 }
