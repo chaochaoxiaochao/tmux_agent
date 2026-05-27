@@ -2,12 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@larksuiteoapi/node-sdk', () => {
   const createMock = vi.fn().mockResolvedValue({ data: { message_id: 'om_x' } });
+  const registerMock = vi.fn();
+  const startMock = vi.fn().mockResolvedValue(undefined);
+  const stopMock = vi.fn().mockResolvedValue(undefined);
   return {
     Client: vi.fn().mockImplementation(() => ({
       im: { message: { create: createMock } },
     })),
+    EventDispatcher: vi.fn().mockImplementation(() => ({ register: registerMock })),
+    WSClient: vi.fn().mockImplementation(() => ({ start: startMock, stop: stopMock })),
     AppType: { SelfBuild: 'SelfBuild' },
     __createMock: createMock,
+    __registerMock: registerMock,
+    __startMock: startMock,
+    __stopMock: stopMock,
   };
 });
 
@@ -24,7 +32,9 @@ const n: RichNotification = {
   buttons: [], eventId: 'e1', paneId: '%1', session: 'main', windowId: '@2',
 };
 
-describe('LarkChannel (no WS in Phase 1)', () => {
+const tmuxSpy = { sendKeysToPane: vi.fn().mockResolvedValue(undefined) } as any;
+
+describe('LarkChannel', () => {
   beforeEach(() => { process.env.LARK_APP_SECRET = 'sec'; vi.clearAllMocks(); });
 
   it('init builds Client with app_id + appSecret from env', async () => {
@@ -52,5 +62,30 @@ describe('LarkChannel (no WS in Phase 1)', () => {
     expect(arg.data.msg_type).toBe('interactive');
     expect(typeof arg.data.content).toBe('string');
     expect(JSON.parse(arg.data.content).header.title.content).toBe('✅ done');
+  });
+
+  it('init starts WSClient with EventDispatcher registering card.action.trigger when tmux provided', async () => {
+    const ch = new LarkChannel(cfg, tmuxSpy);
+    await ch.init();
+    expect((lark as any).EventDispatcher).toHaveBeenCalled();
+    expect((lark as any).__registerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ 'card.action.trigger': expect.any(Function) })
+    );
+    expect((lark as any).WSClient).toHaveBeenCalled();
+    expect((lark as any).__startMock).toHaveBeenCalled();
+  });
+
+  it('init without tmux does NOT start WSClient (send-only mode)', async () => {
+    const ch = new LarkChannel(cfg);  // no tmux
+    await ch.init();
+    expect((lark as any).WSClient).not.toHaveBeenCalled();
+    expect((lark as any).__startMock).not.toHaveBeenCalled();
+  });
+
+  it('shutdown calls WSClient.stop when WS was started', async () => {
+    const ch = new LarkChannel(cfg, tmuxSpy);
+    await ch.init();
+    await ch.shutdown();
+    expect((lark as any).__stopMock).toHaveBeenCalled();
   });
 });

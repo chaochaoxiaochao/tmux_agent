@@ -1,26 +1,47 @@
 import * as lark from '@larksuiteoapi/node-sdk';
 import type { Channel, RichNotification } from './types.js';
 import type { NotifyConfig } from '../config.schema.js';
+import type { TmuxControl } from '../tmux-control.js';
 import { buildLarkCard } from './lark-card.js';
+import { handleCardAction } from './lark-router.js';
 
 export class LarkChannel implements Channel {
   readonly kind = 'lark' as const;
   enabled: boolean;
   // protected so Phase 2 subclass (WS + EventDispatcher) can reuse client/cfg.
   protected client?: lark.Client;
+  protected wsClient?: any;
 
-  constructor(protected cfg: NotifyConfig['channels']['lark']) {
+  constructor(protected cfg: NotifyConfig['channels']['lark'], protected tmux?: TmuxControl) {
     this.enabled = cfg.enabled;
   }
 
   async init() {
     const secret = process.env[this.cfg.app_secret_env];
     if (!secret) throw new Error(`env ${this.cfg.app_secret_env} is empty`);
+
     this.client = new lark.Client({
       appId: this.cfg.app_id,
       appSecret: secret,
       appType: lark.AppType.SelfBuild,
     });
+
+    // 只有提供了 tmux (即 Phase 2 buildServer 注入) 时才启动 WS 接收回调.
+    // Phase 1 / 仅发送场景下 tmux=undefined, init 跳过 WS, 节省连接.
+    if (this.tmux) {
+      const dispatcher = new (lark as any).EventDispatcher({});
+      dispatcher.register({
+        'card.action.trigger': async (ev: any) => handleCardAction(ev, {
+          ownerOpenId: this.cfg.owner_open_id,
+          tmux: this.tmux!,
+        }),
+      });
+      this.wsClient = new (lark as any).WSClient({
+        appId: this.cfg.app_id,
+        appSecret: secret,
+      });
+      await this.wsClient.start({ eventDispatcher: dispatcher });
+    }
   }
 
   async send(n: RichNotification) {
@@ -40,5 +61,10 @@ export class LarkChannel implements Channel {
     }
   }
 
-  async shutdown() {}
+  async shutdown() {
+    if (this.wsClient) {
+      try { await this.wsClient.stop(); }
+      catch (e) { console.error('[lark] WS stop failed:', (e as Error).message); }
+    }
+  }
 }
