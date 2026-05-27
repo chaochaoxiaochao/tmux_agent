@@ -12,6 +12,7 @@ vi.mock('@larksuiteoapi/node-sdk', () => {
     EventDispatcher: vi.fn().mockImplementation(() => ({ register: registerMock })),
     WSClient: vi.fn().mockImplementation(() => ({ start: startMock, stop: stopMock })),
     AppType: { SelfBuild: 'SelfBuild' },
+    LoggerLevel: { debug: 0, info: 1, warn: 2, error: 3 },
     __createMock: createMock,
     __registerMock: registerMock,
     __startMock: startMock,

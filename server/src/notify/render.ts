@@ -86,40 +86,11 @@ export function renderNotification(ev: NotifyEvent, opts: RenderOpts): RichNotif
     deepLink = `${opts.publicUrl}/#/w/${encodeURIComponent(ev.session)}/${encodeURIComponent(ev.windowId)}`;
   }
 
-  // Phase 2: 按事件类型加 callback 按钮 (Approve/Deny / AskUserQuestion 选项 / 快捷文本).
-  // Open Web link 按钮放最后, 总是有.
+  // 用户决定: 卡片只做"概览通知", 不带任何 callback/link 按钮.
+  // 一是手机渲染兼容性差 (column_set + button 飞书 client 会 fallback 到"请升级"),
+  // 二是卡片简洁,交互通过 web 进行。Phase 2 的按钮回调路径在 lark-router
+  // 保留可用,但 render 不再生成按钮。
   const buttons: Button[] = [];
-
-  if (ev.hook_event_name === 'PermissionRequest' && ev.tool_name === 'AskUserQuestion') {
-    const options = (ev.tool_input as any)?.questions?.[0]?.options ?? [];
-    options.forEach((o: any, idx: number) => {
-      buttons.push({
-        text: o.label ?? String(o),
-        style: 'primary',
-        kind: 'callback',
-        value: { action: 'answer', paneId: ev.paneId, eventId: opts.eventId, option_index: idx },
-      });
-    });
-  } else if (ev.hook_event_name === 'PermissionRequest') {
-    buttons.push({ text: '✅ Approve', style: 'primary', kind: 'callback',
-      value: { action: 'approve', paneId: ev.paneId, eventId: opts.eventId } });
-    buttons.push({ text: '❌ Deny', style: 'danger', kind: 'callback',
-      value: { action: 'deny', paneId: ev.paneId, eventId: opts.eventId } });
-  }
-
-  // Stop / Notification 给快捷文本 + Ctrl-C 取消按钮.
-  if (ev.hook_event_name === 'Stop' || ev.hook_event_name === 'Notification') {
-    for (const t of ['继续', '重试', '停止']) {
-      buttons.push({ text: t, style: 'default', kind: 'callback',
-        value: { action: 'text', paneId: ev.paneId, eventId: opts.eventId, text: t } });
-    }
-    buttons.push({ text: '⏹ Ctrl-C', style: 'danger', kind: 'callback',
-      value: { action: 'cancel', paneId: ev.paneId, eventId: opts.eventId } });
-  }
-
-  if (deepLink) {
-    buttons.push({ text: '🔗 打开 Web', style: 'default', kind: 'link', url: deepLink });
-  }
 
   let agentsSnapshot: string | undefined;
   let agentRows: AgentRow[] | undefined;

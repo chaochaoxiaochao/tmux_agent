@@ -29,16 +29,22 @@ export class LarkChannel implements Channel {
     // 只有提供了 tmux (即 Phase 2 buildServer 注入) 时才启动 WS 接收回调.
     // Phase 1 / 仅发送场景下 tmux=undefined, init 跳过 WS, 节省连接.
     if (this.tmux) {
-      const dispatcher = new (lark as any).EventDispatcher({});
+      const dispatcher = new (lark as any).EventDispatcher({
+        loggerLevel: ((lark as any).LoggerLevel && (lark as any).LoggerLevel.debug) || 0,
+      });
       dispatcher.register({
-        'card.action.trigger': async (ev: any) => handleCardAction(ev, {
-          ownerOpenId: this.cfg.owner_open_id,
-          tmux: this.tmux!,
-        }),
+        'card.action.trigger': async (ev: any) => {
+          console.error('[lark][cb] card.action.trigger', JSON.stringify(ev));
+          return handleCardAction(ev, {
+            ownerOpenId: this.cfg.owner_open_id,
+            tmux: this.tmux!,
+          });
+        },
       });
       this.wsClient = new (lark as any).WSClient({
         appId: this.cfg.app_id,
         appSecret: secret,
+        loggerLevel: ((lark as any).LoggerLevel && (lark as any).LoggerLevel.debug) || 0,
       });
       await this.wsClient.start({ eventDispatcher: dispatcher });
     }

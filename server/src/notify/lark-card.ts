@@ -3,57 +3,19 @@ import type { RichNotification, Button, AgentRow } from './types.js';
 export function buildLarkCard(n: RichNotification): any {
   const elements: any[] = [];
 
-  elements.push({
-    tag: 'div',
-    text: { tag: 'lark_md', content: n.body },
-  });
-
-  if (n.fields.length > 0) {
-    elements.push({
-      tag: 'div',
-      fields: n.fields.map(f => ({
-        is_short: true,
-        text: { tag: 'lark_md', content: `**${f.label}**\n\`${f.value}\`` },
-      })),
-    });
-  }
-
-  // agents 段优先用结构化 table 组件; 没有结构化数据则退化到 markdown.
+  // Phase 3 layout: 每个 agent 两行 markdown (手机表格 cell 限高省略截字, 改用纯
+  // 段落). header 已表达事件类型, 不重复 body/fields.
   if (n.agents && n.agents.length > 0) {
-    elements.push({ tag: 'hr' });
-    elements.push({ tag: 'markdown', content: '**当前所有 agents**' });
-    elements.push(buildAgentsTable(n.agents));
+    elements.push({ tag: 'div', text: { tag: 'lark_md', content: buildAgentsMarkdown(n.agents) } });
   } else if (n.agentsSnapshot) {
-    elements.push({ tag: 'hr' });
     elements.push({ tag: 'div', text: { tag: 'lark_md', content: n.agentsSnapshot } });
+  } else {
+    elements.push({ tag: 'div', text: { tag: 'lark_md', content: n.body } });
   }
 
-  // Phase 3: 自由输入文本框 + 发送到 pane 按钮. 放在底部按钮排之前, 让 input
-  // 框出现在快捷按钮上方. schema 2.0 风格 - input 直接是 body.elements 成员;
-  // 发送按钮单独封一个 column_set, 不混进下面的快捷按钮排.
-  if (n.inputSlot) {
-    elements.push({
-      tag: 'input',
-      name: 'pane_text',
-      placeholder: { tag: 'plain_text', content: '直接打字发送到 pane...' },
-    });
-    elements.push({
-      tag: 'column_set',
-      flex_mode: 'none',
-      horizontal_spacing: 'small',
-      columns: [{
-        tag: 'column',
-        width: 'auto',
-        vertical_align: 'top',
-        elements: [{
-          tag: 'button',
-          text: { tag: 'plain_text', content: '📨 发送到 pane' },
-          type: 'primary',
-          value: { action: 'text_input', paneId: n.paneId, eventId: n.eventId },
-        }],
-      }],
-    });
-  }
+  // Phase 3 inputSlot 弃用: 飞书 client form 提交事件不走 card.action.trigger
+  // (WS 长连无法收到). 自由文本走 "飞书私聊直接打字 + im.message.receive_v1"
+  // 路由 (Phase 3 Task 2 提供).
 
   // schema 2.0: action tag 已废弃, 按钮直接作为 element 或装进 column_set.
   // 用 column_set 让按钮排成一行 (横向多列, 每列 1 个 button).
@@ -82,8 +44,30 @@ export function buildLarkCard(n: RichNotification): any {
   };
 }
 
-// 飞书 schema 2.0 table 组件: columns 定义列, rows 是单元格内容.
-// row[colName] 可以是 string (lark_md) 或 markdown 段, 这里全用 markdown.
+// 每个 agent 渲染为 markdown 两行: 一行主标识 + 一行细节.
+// 不用 table, 因为飞书 cell 限高 + 截字.
+function buildAgentsMarkdown(agents: AgentRow[]): string {
+  const lines: string[] = [];
+  for (const a of agents) {
+    const where = a.deepLink
+      ? `[${a.session}:${a.windowLabel}#${a.paneIndex}](${a.deepLink})`
+      : `${a.session}:${a.windowLabel}#${a.paneIndex}`;
+    const here = a.isCurrent ? ' **← 本次**' : '';
+    const cwdShort = a.cwd ? a.cwd.split('/').slice(-2).join('/') : '';
+    const subParts: string[] = [];
+    if (a.claudeLabel) subParts.push(`\`${a.claudeLabel}\``);
+    subParts.push(a.time);
+    if (cwdShort) subParts.push(`\`${cwdShort}\``);
+    if (a.lastMessage) subParts.push(`"${a.lastMessage}"`);
+    // 第 1 行: 状态 + session:win#pane (粗体作主行)
+    lines.push(`${a.stateLabel} · **${where}**${here}`);
+    // 第 2 行: 细节, 缩进让视觉成一组
+    lines.push(`　　${subParts.join(' · ')}`);
+  }
+  return lines.join('\n');
+}
+
+// 留作未来 (table cell 限制解决后), 暂时不调用.
 function buildAgentsTable(agents: AgentRow[]): any {
   // 飞书私聊单屏窄, 5 列会被挤换行. 压成 2 列:
   // 列 1 "状态" (短): 🟢 / ⏳ / ✅ / 💤 + 短文字

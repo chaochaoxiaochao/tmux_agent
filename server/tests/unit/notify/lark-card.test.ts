@@ -39,18 +39,10 @@ describe('buildLarkCard', () => {
     expect(btn.url).toBeUndefined();
   });
 
-  it('inputSlot=true adds an input element + send-to-pane button', () => {
+  // inputSlot form 已弃用 (飞书 client 渲染 fallback + SDK 不暴露 form_value).
+  it('inputSlot=true is ignored (form rendering deprecated)', () => {
     const c = buildLarkCard({ ...base, inputSlot: true });
-    const input = c.body.elements.find((e: any) => e.tag === 'input');
-    expect(input).toBeDefined();
-    expect(input.name).toBe('pane_text');
-    // 找含 text_input action 的 button (在 column_set 里)
-    const allButtons = c.body.elements
-      .filter((e: any) => e.tag === 'column_set')
-      .flatMap((cs: any) => cs.columns.flatMap((col: any) => col.elements))
-      .filter((el: any) => el.tag === 'button');
-    const sendBtn = allButtons.find((b: any) => b.value?.action === 'text_input');
-    expect(sendBtn).toBeDefined();
-    expect(sendBtn.value.paneId).toBe(base.paneId);
+    const form = c.body.elements.find((e: any) => e.tag === 'form');
+    expect(form).toBeUndefined();
   });
 });

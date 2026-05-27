@@ -39,36 +39,19 @@ describe('renderNotification', () => {
     expect(r.body).toContain('q?');
   });
 
-  it('PermissionRequest (non-Ask) gets Approve/Deny/Open buttons', () => {
-    const r = renderNotification(
-      { ...base, hook_event_name: 'PermissionRequest', tool_name: 'Bash', message: '', tool_input: undefined },
-      { eventId: 'e10', publicUrl: 'https://x' },
-    );
-    const kinds = r.buttons.map(b => `${b.kind}:${b.value?.action ?? b.url ?? ''}`);
-    expect(kinds).toEqual(expect.arrayContaining([
-      'callback:approve', 'callback:deny',
-    ]));
-    expect(r.buttons.some(b => b.kind === 'link')).toBe(true);
-  });
-
-  it('AskUserQuestion: each option becomes an answer button', () => {
-    const r = renderNotification(
-      { ...base, hook_event_name: 'PermissionRequest', tool_name: 'AskUserQuestion',
-        message: '', tool_input: { questions: [{ question: 'q?', options: [{ label: 'A' }, { label: 'B' }] }] } },
-      { eventId: 'e11', publicUrl: 'https://x' },
-    );
-    const answer = r.buttons.filter(b => b.value?.action === 'answer');
-    expect(answer.length).toBe(2);
-    expect(answer[0].value?.option_index).toBe(0);
-    expect(answer[1].value?.option_index).toBe(1);
-  });
-
-  it('Stop event gets shortcut text buttons (继续/重试/停止)', () => {
-    const r = renderNotification(
-      { ...base, hook_event_name: 'Stop', tool_name: '', message: '', tool_input: undefined },
-      { eventId: 'e12', publicUrl: 'https://x' },
-    );
-    const texts = r.buttons.filter(b => b.value?.action === 'text').map(b => b.value?.text);
-    expect(texts).toEqual(expect.arrayContaining(['继续', '重试']));
+  // 卡片按钮特性已弃用 (手机渲染兼容差), 所有事件下 r.buttons 都是空数组.
+  it('all event kinds produce empty buttons array (notify-only mode)', () => {
+    for (const ev of [
+      { hook_event_name: 'Stop' as const, tool_name: '' },
+      { hook_event_name: 'PermissionRequest' as const, tool_name: 'Bash' },
+      { hook_event_name: 'PermissionRequest' as const, tool_name: 'AskUserQuestion',
+        tool_input: { questions: [{ question: 'q?', options: [{ label: 'A' }] }] } },
+    ]) {
+      const r = renderNotification(
+        { ...base, message: '', tool_input: undefined, ...ev },
+        { eventId: 'e', publicUrl: 'https://x' },
+      );
+      expect(r.buttons).toEqual([]);
+    }
   });
 });
