@@ -1,4 +1,4 @@
-import type { NotifyEvent, RichNotification, Button } from './types.js';
+import type { NotifyEvent, RichNotification, Button, AgentRow } from './types.js';
 import { snapshot, type AgentEntry } from '../agent-state-registry.js';
 
 export interface RenderOpts { eventId: string; publicUrl?: string }
@@ -122,17 +122,41 @@ export function renderNotification(ev: NotifyEvent, opts: RenderOpts): RichNotif
   }
 
   let agentsSnapshot: string | undefined;
+  let agentRows: AgentRow[] | undefined;
   try {
     const section = renderAgentsSection(agents, ev.paneId, opts.publicUrl);
     if (section) agentsSnapshot = `────── 当前所有 agents ──────\n${section}`;
+    agentRows = buildAgentRows(agents, ev.paneId, opts.publicUrl);
   } catch {
     // 静默: agents 段失败不影响主体
   }
 
   return {
     headline, body, fields,
-    deepLink, buttons, agentsSnapshot,
+    deepLink, buttons, agentsSnapshot, agents: agentRows,
     eventId: opts.eventId,
     paneId: ev.paneId, session: ev.session, windowId: ev.windowId,
   };
+}
+
+// 给 lark-card 用的结构化数据 (按 state 排序; agentsSnapshot 是给 wecom 的 markdown).
+function buildAgentRows(agents: AgentEntry[], curPaneId: string, publicUrl?: string): AgentRow[] | undefined {
+  if (agents.length === 0) return undefined;
+  const sorted = [...agents].sort((a, b) => (STATE_ORDER[a.state] ?? 3) - (STATE_ORDER[b.state] ?? 3));
+  return sorted.map((a): AgentRow => ({
+    state: a.state,
+    stateLabel: STATE_HEADER[a.state] ?? `💤 ${a.state}`,
+    session: a.session,
+    windowLabel: a.windowName?.trim() || a.windowId,
+    paneIndex: a.paneIndex,
+    paneId: a.paneId,
+    cwd: a.cwd,
+    time: new Date(a.lastEventAt).toLocaleTimeString(),
+    claudeLabel: a.claudeSessionName?.trim() || a.claudeSessionId?.slice(0, 8) || undefined,
+    lastMessage: a.lastMessage || undefined,
+    isCurrent: a.paneId === curPaneId,
+    deepLink: publicUrl
+      ? `${publicUrl}/#/w/${encodeURIComponent(a.session)}/${encodeURIComponent(a.windowId)}/${encodeURIComponent(a.paneId)}`
+      : undefined,
+  }));
 }

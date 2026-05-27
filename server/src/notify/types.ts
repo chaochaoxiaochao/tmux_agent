@@ -21,11 +21,27 @@ export interface Button {
   value?: { action: string; paneId: string; eventId: string; [k: string]: unknown };
 }
 
+export interface AgentRow {
+  state: string;          // running / request / done / idle
+  stateLabel: string;     // 🟢 跑着 / ⏳ 等输入 / ✅ 刚完成 / 💤 闲着
+  session: string;
+  windowLabel: string;    // windowName || windowId
+  paneIndex: number;
+  paneId: string;
+  cwd: string;
+  time: string;           // HH:MM:SS
+  claudeLabel?: string;   // claudeSessionName || sliced id
+  lastMessage?: string;
+  isCurrent: boolean;     // 是否是 ev.paneId 对应的那行
+  deepLink?: string;
+}
+
 export interface RichNotification {
   headline: string;
   body: string;
   fields: Array<{ label: string; value: string }>;
-  agentsSnapshot?: string;
+  agentsSnapshot?: string;     // markdown 字符串, wecom 用
+  agents?: AgentRow[];         // 结构化, lark 卡片 table 用
   deepLink?: string;
   buttons: Button[];
   eventId: string;

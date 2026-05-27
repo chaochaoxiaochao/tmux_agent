@@ -15,14 +15,16 @@ describe('buildLarkCard', () => {
     const c = buildLarkCard(base);
     expect(c.header.title.content).toBe(base.headline);
     expect(c.header.title.tag).toBe('plain_text');
-    expect(Array.isArray(c.elements)).toBe(true);
+    expect(Array.isArray(c.body.elements)).toBe(true);
   });
 
-  it('link button becomes url-style action button (no callback)', () => {
+  it('link button becomes url-style button inside column_set (no callback)', () => {
     const c = buildLarkCard(base);
-    const action = c.elements.find((e: any) => e.tag === 'action');
-    expect(action.actions[0].url).toBe('https://x');
-    expect(action.actions[0].value).toBeUndefined();
+    const colset = c.body.elements.find((e: any) => e.tag === 'column_set');
+    const btn = colset.columns[0].elements[0];
+    expect(btn.tag).toBe('button');
+    expect(btn.url).toBe('https://x');
+    expect(btn.value).toBeUndefined();
   });
 
   it('callback button gets value with action/paneId/eventId', () => {
@@ -31,8 +33,9 @@ describe('buildLarkCard', () => {
       buttons: [{ text: 'Approve', style: 'primary', kind: 'callback',
         value: { action: 'approve', paneId: '%1', eventId: 'e1' } }],
     });
-    const action = c.elements.find((e: any) => e.tag === 'action');
-    expect(action.actions[0].value.action).toBe('approve');
-    expect(action.actions[0].url).toBeUndefined();
+    const colset = c.body.elements.find((e: any) => e.tag === 'column_set');
+    const btn = colset.columns[0].elements[0];
+    expect(btn.value.action).toBe('approve');
+    expect(btn.url).toBeUndefined();
   });
 });

@@ -56,8 +56,9 @@ export class LarkChannel implements Channel {
           content: JSON.stringify(card),
         },
       });
-    } catch (e) {
-      console.error('[lark] send failed:', (e as Error).message);
+    } catch (e: any) {
+      const detail = e?.response?.data ? JSON.stringify(e.response.data) : '';
+      console.error('[lark] send failed:', (e as Error).message, detail);
     }
   }
 
