@@ -3,14 +3,30 @@ import type { RichNotification, Button, AgentRow } from './types.js';
 export function buildLarkCard(n: RichNotification): any {
   const elements: any[] = [];
 
-  // Phase 3 layout: 每个 agent 两行 markdown (手机表格 cell 限高省略截字, 改用纯
-  // 段落). header 已表达事件类型, 不重复 body/fields.
+  // 主体: 事件正文 (headline 在 header, body 是 "主人我需要问你：<问题>" 一类正文).
+  // 跟企微对齐 —— header 表事件类型, body 仍要展示, 不省略 (用户反馈: 飞书卡片缺正文/标识).
+  if (n.body) {
+    elements.push({ tag: 'div', text: { tag: 'lark_md', content: n.body } });
+  }
+
+  // fields: Session / Cwd / Time —— 跟企微的 `>label: \`value\`` 对齐, 给本次事件加上下文标识.
+  if (n.fields.length > 0) {
+    const fieldLines = n.fields.map(f => `**${f.label}**: \`${f.value}\``).join('\n');
+    elements.push({ tag: 'div', text: { tag: 'lark_md', content: fieldLines } });
+  }
+
+  // deep link: 👉 打开 Web (跟企微对齐).
+  if (n.deepLink) {
+    elements.push({ tag: 'div', text: { tag: 'lark_md', content: `[👉 打开 Web](${n.deepLink})` } });
+  }
+
+  // agents 概览段 (放正文之后). 手机表格 cell 限高省略截字, 改用纯段落 markdown.
   if (n.agents && n.agents.length > 0) {
+    elements.push({ tag: 'hr' });
     elements.push({ tag: 'div', text: { tag: 'lark_md', content: buildAgentsMarkdown(n.agents) } });
   } else if (n.agentsSnapshot) {
+    elements.push({ tag: 'hr' });
     elements.push({ tag: 'div', text: { tag: 'lark_md', content: n.agentsSnapshot } });
-  } else {
-    elements.push({ tag: 'div', text: { tag: 'lark_md', content: n.body } });
   }
 
   // Phase 3 inputSlot 弃用: 飞书 client form 提交事件不走 card.action.trigger

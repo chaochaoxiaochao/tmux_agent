@@ -68,7 +68,10 @@ export function renderNotification(ev: NotifyEvent, opts: RenderOpts): RichNotif
 
   if (ev.hook_event_name === 'Stop') {
     headline = '✅ Claude Code 任务完成';
-    body = '主人我完成任务了';
+    // 带上本次 Claude 的最后一句话: 优先 hook 透传的 ev.message,
+    // 退回 agent registry 里本 pane 的 lastMessage (Stop hook 经 /api/agent-state 写入).
+    const lastSay = ev.message?.trim() || agents.find(a => a.paneId === ev.paneId)?.lastMessage?.trim();
+    body = lastSay ? `主人我完成任务了：\n${lastSay}` : '主人我完成任务了';
   } else if (ev.hook_event_name === 'PermissionRequest' && ev.tool_name === 'AskUserQuestion') {
     headline = '❓ Claude Code 需要询问';
     const q = (ev.tool_input as any)?.questions?.[0]?.question ?? '';
